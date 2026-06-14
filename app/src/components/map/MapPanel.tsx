@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { buildCumDist, speedColor, addMins } from '../../lib/math';
+import { buildCumDist, speedColor, addMins, interpAtSec } from '../../lib/math';
 import PlaybackBar from './PlaybackBar';
 import DeviceList from './DeviceList';
 import MapInfoCard from './MapInfoCard';
@@ -47,9 +47,9 @@ function makeTripEndpoint(type: 'start' | 'end') {
 function makePlaybackVehicleIcon() {
   return L.divIcon({
     html: `<div class="fleet-marker" style="display:flex;align-items:center;justify-content:center;position:relative">
-      <div class="fleet-pin-ring" style="position:absolute;width:32px;height:32px;border-radius:50%;border:1.5px solid #00D4FF;animation:ping 2.5s ease-out infinite;opacity:0;pointer-events:none"></div>
-      <div class="fleet-pin-ring2" style="position:absolute;width:32px;height:32px;border-radius:50%;border:1.5px solid #00D4FF;animation:ping 2.5s ease-out infinite 0.8s;opacity:0;pointer-events:none"></div>
-      <div class="fleet-pin-dot" style="width:14px;height:14px;border-radius:50%;border:2.5px solid #0F1117;box-shadow:0 0 12px rgba(0,212,255,0.6);background:#00D4FF;position:relative;z-index:1"></div>
+      <div class="fleet-pin-ring" style="position:absolute;width:32px;height:32px;border-radius:50%;border:1.5px solid #10B981;animation:ping 2.5s ease-out infinite;opacity:0;pointer-events:none"></div>
+      <div class="fleet-pin-ring2" style="position:absolute;width:32px;height:32px;border-radius:50%;border:1.5px solid #10B981;animation:ping 2.5s ease-out infinite 0.8s;opacity:0;pointer-events:none"></div>
+      <div class="fleet-pin-dot" style="width:16px;height:16px;border-radius:50%;border:2.5px solid #0F1117;box-shadow:0 0 14px rgba(16,185,129,0.7);background:#10B981;position:relative;z-index:1"></div>
     </div>`,
     className: '',
     iconSize: [32, 32],
@@ -142,6 +142,22 @@ const MapPanel = forwardRef<MapPanelHandle, MapPanelProps>(function MapPanel({ d
       return { ...prev, currentSec: Math.max(0, Math.min(prev.totalDur, sec)) };
     });
   }, []);
+
+  // Move playback vehicle marker and update done-line trail
+  useEffect(() => {
+    if (!pb?.active || !pb.vehicleMarker || !pb.coords.length || !pb.totalDur) return;
+    const { latlng, idx } = interpAtSec(pb.currentSec, pb.coords, pb.speeds, pb.totalDur);
+    pb.vehicleMarker.setLatLng(latlng);
+
+    // Draw completed portion of the route
+    const map = mapRef.current;
+    if (!map) return;
+    if (pbDoneLine.current) { try { map.removeLayer(pbDoneLine.current); } catch {} }
+    const doneCoords = pb.coords.slice(0, Math.min(idx + 2, pb.coords.length));
+    if (doneCoords.length >= 2) {
+      pbDoneLine.current = L.polyline(doneCoords, { color: '#10B981', weight: 4, opacity: 0.9 }).addTo(map);
+    }
+  }, [pb?.currentSec, pb?.active]);
 
   const showTripOnMap = useCallback(async (trip: FrontendTrip, wpts: [number, number][]) => {
     clearTripLayers();
