@@ -30,6 +30,7 @@ export default function SettingsPanel({ showToast }: { showToast: (msg: string) 
   const [devices, setDevices] = useState<Device[]>([])
   const [newUser, setNewUser] = useState({ email: '', name: '', password: '', role: 'viewer' })
   const [creating, setCreating] = useState(false)
+  const [siteName, setSiteName] = useState(localStorage.getItem('fleetoss-site-name') || 'FleetOSS')
 
   useEffect(() => {
     fetch('/api/stats').then(r => r.json()).then(setStats).catch(() => {})
@@ -126,6 +127,31 @@ export default function SettingsPanel({ showToast }: { showToast: (msg: string) 
           <div className="p-6">
             <h1 className="text-lg font-semibold mb-1">General</h1>
             <p className="text-xs text-text-muted mb-6">Server status and information</p>
+
+            <div className="bg-surface border border-border rounded-lg p-4 mb-6">
+              <h2 className="text-sm font-semibold mb-3">Branding</h2>
+              <div className="flex items-center gap-3">
+                <div className="flex flex-col gap-1 flex-1">
+                  <label className="text-[10px] text-text-muted">Site Name</label>
+                  <input
+                    className="bg-surface-2 border border-border rounded px-2.5 py-1.5 text-xs text-text outline-none focus:border-cyan w-full max-w-xs"
+                    value={siteName}
+                    onChange={e => {
+                      setSiteName(e.target.value)
+                      localStorage.setItem('fleetoss-site-name', e.target.value)
+                    }}
+                  />
+                </div>
+                <button
+                  className="px-3 py-1.5 rounded-lg bg-transparent text-text-dim border border-border text-xs cursor-pointer hover:bg-surface-2 transition-colors self-end"
+                  onClick={() => {
+                    setSiteName('FleetOSS')
+                    localStorage.removeItem('fleetoss-site-name')
+                  }}
+                >Reset</button>
+              </div>
+            </div>
+
             {stats ? (
               <>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
@@ -262,15 +288,15 @@ export default function SettingsPanel({ showToast }: { showToast: (msg: string) 
                         <td className="px-4 py-2.5">
                           <button
                             onClick={() => toggleTripDetection(d)}
-                            className={`relative w-9 h-5 rounded-full transition-colors cursor-pointer border-none ${
+                            className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer border-none shrink-0 ${
                               disabled ? 'bg-amber' : 'bg-cyan'
                             }`}
                           >
-                            <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-bg shadow transition-transform ${
-                              disabled ? 'translate-x-[18px]' : 'translate-x-0.5'
+                            <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-bg shadow transition-transform ${
+                              disabled ? 'translate-x-5' : 'translate-x-0'
                             }`} />
                           </button>
-                          <span className="ml-2 text-text-muted font-mono text-[10px]">{disabled ? 'Disabled' : 'Active'}</span>
+                          <span className="ml-2 text-text-muted font-mono text-[10px] align-middle">{disabled ? 'Disabled' : 'Active'}</span>
                         </td>
                         <td className="px-4 py-2.5">
                           <button
