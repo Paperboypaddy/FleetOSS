@@ -8,9 +8,9 @@ services:
     environment:
       POSTGRES_DB: fleetoss
       POSTGRES_USER: fleetoss
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-fleetoss_prod}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-fleetoss_dev}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata_prod:/var/lib/postgresql/data
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U fleetoss']
       interval: 5s
@@ -33,9 +33,9 @@ services:
       - '9001:9001'
     environment:
       MINIO_ROOT_USER: ${MINIO_USER:-fleetoss}
-      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-fleetoss_prod}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-fleetoss_dev}
     volumes:
-      - minio_data:/data
+      - minio_data_prod:/data
     command: server /data --console-address ':9001'
 
   server:
@@ -50,11 +50,11 @@ services:
       NODE_ENV: production
       PORT: '4000'
       HOST: '0.0.0.0'
-      DATABASE_URL: postgres://fleetoss:${DB_PASSWORD:-fleetoss_prod}@postgres:5432/fleetoss
+      DATABASE_URL: postgres://fleetoss:${DB_PASSWORD:-fleetoss_dev}@postgres:5432/fleetoss
       JWT_SECRET: ${JWT_SECRET}
       S3_ENDPOINT: http://minio:9000
       S3_ACCESS_KEY: ${MINIO_USER:-fleetoss}
-      S3_SECRET_KEY: ${MINIO_PASSWORD:-fleetoss_prod}
+      S3_SECRET_KEY: ${MINIO_PASSWORD:-fleetoss_dev}
       S3_BUCKET: ${S3_BUCKET:-fleetoss}
       REDIS_URL: redis://redis:6379
     depends_on:
@@ -75,5 +75,5 @@ services:
       - server
 
 volumes:
-  pgdata:
-  minio_data:
+  pgdata_prod:
+  minio_data_prod:
