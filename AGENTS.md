@@ -67,6 +67,7 @@ Error responses include `requestId` for debugging:
 - 2026-06-14 — Pagination on all list endpoints + request IDs on all responses + API auth lockdown
 - 2026-06-14 — SSO settings panel (frontend CRUD UI for LDAP/OIDC/OAuth2/SAML provider config)
 - 2026-06-14 — Pluggable auth system: LDAP, OIDC, OAuth2, SAML strategies + Keycloak + SSO login page
+- 2026-06-14 — Dockerized server + frontend, production docker-compose, CI/CD + release workflows
 - 2026-06-14 — Playback keyboard controls (Space, arrow keys, 1-6 for speed, Esc), shortcut hint bar, follow-mode button
 - 2026-06-14 — Redis integration: persistent trip detection, async geocode queue, WebSocket fan-out, rate limiting
 - 2026-06-14 — Error handling middleware (AppError class + global error handler), removed redundant try/catch from all routes
@@ -287,9 +288,11 @@ Frontend has its own types in `app/src/types/index.ts` (older/separate — consi
 - [x] Save geocoded addresses back to trips table
 
 ### 6. Infrastructure
-- [ ] Dockerize the server
-- [ ] Dockerize the frontend
-- [ ] Add CI/CD pipeline
+- [x] Dockerize the server (multi-stage `Dockerfile`)
+- [x] Dockerize the frontend (nginx-based `app/Dockerfile`)
+- [x] Production docker-compose (`docker-compose.prod.yml`)
+- [x] CI/CD pipeline (GitHub Actions: lint, test, build, push to GHCR)
+- [x] Release workflow (tag → build images + GitHub Release)
 - [ ] Add Helm chart for Kubernetes deployment
 
 ### 7. Redis Integration

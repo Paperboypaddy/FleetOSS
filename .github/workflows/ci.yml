@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build -w packages/core
+      - run: npx tsc --noEmit -p packages/server/tsconfig.json
+      - run: cd app && npx tsc --noEmit
+
+  test:
+    runs-on: ubuntu-latest
+    needs: lint
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_DB: fleetoss
+          POSTGRES_USER: fleetoss
+          POSTGRES_PASSWORD: fleetoss_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready -U fleetoss
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build -w packages/core
+      - run: npm run build -w packages/server
+        env:
+          DATABASE_URL: postgres://fleetoss:fleetoss_test@localhost:5432/fleetoss
+      - name: Run migrations
+        run: npx tsx packages/server/src/db/migrate.ts
+        env:
+          DATABASE_URL: postgres://fleetoss:fleetoss_test@localhost:5432/fleetoss
+      - name: Smoke test
+        run: |
+          node packages/server/dist/index.js &
+          SERVER_PID=$!
+          sleep 2
+          curl -sf http://localhost:4000/api/health
+          kill $SERVER_PID
+        env:
+          DATABASE_URL: postgres://fleetoss:fleetoss_test@localhost:5432/fleetoss
+          JWT_SECRET: test-secret
+          PORT: '4000'
+
+  build-and-push:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push server image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/server:latest, ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/server:${{ github.sha }}
+      - name: Build and push app image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./app
+          file: app/Dockerfile
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/app:latest, ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/app:${{ github.sha }}

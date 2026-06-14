@@ -1,0 +1,69 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Build and push server image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/server:${{ steps.version.outputs.VERSION }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/server:latest
+
+      - name: Build and push app image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./app
+          file: app/Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/app:${{ steps.version.outputs.VERSION }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/app:latest
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          echo "## FleetOSS v${{ steps.version.outputs.VERSION }}" > /tmp/release.md
+          echo "" >> /tmp/release.md
+          echo "### Changes" >> /tmp/release.md
+          git log --oneline $(git tag --sort=-creatordate | head -2 | tail -1)..HEAD 2>/dev/null | sed 's/^/- /' >> /tmp/release.md || true
+          echo "" >> /tmp/release.md
+          echo "### Images" >> /tmp/release.md
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/server:${{ steps.version.outputs.VERSION }}\`" >> /tmp/release.md
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/app:${{ steps.version.outputs.VERSION }}\`" >> /tmp/release.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: FleetOSS v${{ steps.version.outputs.VERSION }}
+          body_path: /tmp/release.md
+          generate_release_notes: false
