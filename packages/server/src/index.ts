@@ -11,6 +11,8 @@ import { registerUserRoutes } from './api/routes/users.js';
 import { registerStatsRoutes } from './api/routes/stats.js';
 import { registerRealtime } from './realtime/index.js';
 import { startTcpServer } from './ingestion/tcp-server.js';
+import { nmeaHandler } from './ingestion/handlers/nmea-handler.js';
+import { gt06Handler } from './ingestion/handlers/gt06-handler.js';
 import { getPool } from './db/connection.js';
 
 async function main() {
@@ -66,11 +68,17 @@ async function main() {
     app.log.warn(`Could not bind port 5055 (${(err as Error).message}) — skipping`);
   }
 
-  // Start NMEA TCP server for standard GPS receivers
-  try {
-    startTcpServer(5100);
-  } catch (err) {
-    app.log.warn(`Could not start NMEA TCP server (${(err as Error).message}) — skipping`);
+  // Start TCP servers for various GPS device protocols
+  const protocolPorts: [number, string, any][] = [
+    [5100, 'NMEA', nmeaHandler],
+    [5001, 'GT06/Concox', gt06Handler],
+  ];
+  for (const [port, label, handler] of protocolPorts) {
+    try {
+      startTcpServer(port, label, handler);
+    } catch (err) {
+      app.log.warn(`Could not bind ${label} port ${port} (${(err as Error).message}) — skipping`);
+    }
   }
 }
 

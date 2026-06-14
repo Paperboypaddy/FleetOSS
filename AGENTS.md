@@ -180,16 +180,18 @@ Frontend has its own types in `app/src/types/index.ts` (older/separate — consi
 - [x] Server: Geocoded addresses saved to trips table at detection time
 - [x] Server: Port 5055 listener for Traccar Client compatibility
 - [x] Server: NMEA/GPRMC protocol parser + TCP server on port 5100
+- [x] Server: GT06/Concox protocol parser + TCP server on port 5001
 - [x] Infrastructure: Docker Compose (PostGIS, MinIO, Redis)
 - [x] Infrastructure: .gitignore (node_modules, dist, .env, *.log)
 
 ## Next Steps (Priority Order)
 
 ### 1. More protocol parsers
-- [ ] NMEA/GPRMC parser (standard GPS sentence format)
+- [x] NMEA/GPRMC parser + TCP server on port 5100
+- [x] GT06/Concox protocol parser + TCP server on port 5001
 - [ ] TK103 protocol parser (Chinese GPS trackers)
 - [ ] Teltonika protocol parser (#1 protocol globally, 84+ device models)
-- [ ] gt06 protocol parser (Concox, second most common, 83+ models)
+- [ ] Queclink protocol family
 - [ ] OBD-II ELM327 parser (vehicle telemetry)
 - [ ] Document protocol plugin interface
 
