@@ -60,6 +60,7 @@ export interface ApiTrip {
   avgSpeed: number
   maxSpeed: number
   stopDuration: number | null
+  positionCount?: number
   attributes: Record<string, unknown>
 }
 

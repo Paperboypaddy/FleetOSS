@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { eq, desc, and, inArray, sql } from 'drizzle-orm';
 import { getDb } from '../../db/connection.js';
-import { trips } from '../../db/schema.js';
+import { trips, positions } from '../../db/schema.js';
 import { AppError } from '../errors.js';
 import { parsePagination, paginatedResponse } from '../pagination.js';
 import { getAccessibleDeviceIds, checkDevicePermission } from '../permissions.js';
@@ -28,13 +28,35 @@ export function registerTripRoutes(app: FastifyInstance) {
       conditions.push(inArray(trips.deviceId, accessibleIds));
     }
 
+    const where = conditions.length > 0 ? and(...conditions) : undefined;
+
     const [data, countResult] = await Promise.all([
-      conditions.length > 0
-        ? db.select().from(trips).where(and(...conditions)).orderBy(desc(trips.startTime)).offset(offset).limit(limit)
-        : db.select().from(trips).orderBy(desc(trips.startTime)).offset(offset).limit(limit),
-      conditions.length > 0
-        ? db.select({ count: sql<number>`count(*)` }).from(trips).where(and(...conditions))
-        : db.select({ count: sql<number>`count(*)` }).from(trips),
+      db.select({
+        id: trips.id,
+        deviceId: trips.deviceId,
+        startPositionId: trips.startPositionId,
+        endPositionId: trips.endPositionId,
+        startTime: trips.startTime,
+        endTime: trips.endTime,
+        startLat: trips.startLat,
+        startLng: trips.startLng,
+        endLat: trips.endLat,
+        endLng: trips.endLng,
+        startAddress: trips.startAddress,
+        endAddress: trips.endAddress,
+        distance: trips.distance,
+        duration: trips.duration,
+        avgSpeed: trips.avgSpeed,
+        maxSpeed: trips.maxSpeed,
+        stopDuration: trips.stopDuration,
+        attributes: trips.attributes,
+        positionCount: sql<number>`(
+          SELECT COUNT(*) FROM ${positions} 
+          WHERE ${positions.deviceId} = ${trips.deviceId}
+          AND ${positions.deviceTimestamp} BETWEEN ${trips.startTime} AND ${trips.endTime}
+        )`,
+      }).from(trips).where(where).orderBy(desc(trips.startTime)).offset(offset).limit(limit),
+      db.select({ count: sql<number>`count(*)` }).from(trips).where(where),
     ]);
     return reply.send(paginatedResponse(data, Number(countResult[0].count), page, limit));
   });
