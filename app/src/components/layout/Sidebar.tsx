@@ -37,8 +37,12 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
       ))}
       <div className="mt-auto">
         <button
-          onClick={() => {}}
-          className="w-10 h-10 rounded-lg border-none bg-transparent text-text-muted hover:bg-surface-2 hover:text-text-dim flex items-center justify-center cursor-pointer transition-colors relative group"
+          onClick={() => onPanelChange('settings')}
+          className={`w-10 h-10 rounded-lg border-none flex items-center justify-center cursor-pointer transition-colors relative group ${
+            activePanel === 'settings'
+              ? 'bg-[var(--color-cyan-dim)] text-cyan'
+              : 'bg-transparent text-text-muted hover:bg-surface-2 hover:text-text-dim'
+          }`}
         >
           <SettingsIcon className="w-[18px] h-[18px]" />
           <span className="absolute left-[calc(100%+8px)] top-1/2 -translate-y-1/2 bg-surface-2 border border-border rounded px-2 py-[3px] text-xs whitespace-nowrap text-text pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50">

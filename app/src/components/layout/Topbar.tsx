@@ -5,6 +5,7 @@ const labels: Record<PanelId, string> = {
   trips: 'Trip Log',
   maint: 'Maintenance',
   fuel: 'Fuel Log',
+  settings: 'Settings',
 };
 
 interface TopbarProps {

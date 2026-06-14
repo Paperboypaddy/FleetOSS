@@ -6,6 +6,7 @@ import { registerIngestionRoutes, handleTraccarIngest } from './ingestion/server
 import { registerDeviceRoutes } from './api/routes/devices.js';
 import { registerPositionRoutes } from './api/routes/positions.js';
 import { registerTripRoutes } from './api/routes/trips.js';
+import { registerStatsRoutes } from './api/routes/stats.js';
 import { registerRealtime } from './realtime/index.js';
 import { getPool } from './db/connection.js';
 
@@ -35,6 +36,7 @@ async function main() {
   registerDeviceRoutes(app);
   registerPositionRoutes(app);
   registerTripRoutes(app);
+  registerStatsRoutes(app);
   registerRealtime(app);
 
   // Start on configured port (default 4000)

@@ -73,4 +73,4 @@ export interface PlaybackState {
   segLayers: any[];
 }
 
-export type PanelId = 'map' | 'trips' | 'maint' | 'fuel';
+export type PanelId = 'map' | 'trips' | 'maint' | 'fuel' | 'settings';

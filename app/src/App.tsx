@@ -6,6 +6,7 @@ import type { MapPanelHandle } from './components/map/MapPanel';
 import TripsPanel from './components/trips/TripsPanel';
 import MaintPanel from './components/maint/MaintPanel';
 import FuelPanel from './components/fuel/FuelPanel';
+import SettingsPanel from './components/settings/SettingsPanel';
 import Toast from './components/ui/Toast';
 import type { PanelId } from './types';
 import { fetchDevices, fetchTrips, connectWebSocket, renameDevice, deleteDevice, fetchTripPositions } from './lib/api';
@@ -95,6 +96,7 @@ export default function App() {
           {activePanel === 'trips' && <TripsPanel showToast={showToast} onShowTrip={handleShowTrip} trips={trips} />}
           {activePanel === 'maint' && <MaintPanel showToast={showToast} />}
           {activePanel === 'fuel' && <FuelPanel showToast={showToast} />}
+          {activePanel === 'settings' && <SettingsPanel showToast={showToast} />}
         </div>
       </div>
       <Toast message={toastMsg} onDone={() => setToastMsg(null)} />
