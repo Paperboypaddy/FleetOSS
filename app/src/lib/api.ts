@@ -227,8 +227,8 @@ export async function fetchTrips(): Promise<FrontendTrip[]> {
 
     // Auto-geocode start/end addresses (only if they're just coordinates)
     for (const trip of trips) {
-      const startIsCoord = trip.from.includes(',') && !trip.from.includes(' ')
-      const endIsCoord = trip.to.includes(',') && !trip.to.includes(' ')
+      const startIsCoord = /^-?[\d.]+,\s*-?[\d.]+$/.test(trip.from.trim())
+      const endIsCoord = /^-?[\d.]+,\s*-?[\d.]+$/.test(trip.to.trim())
       if (startIsCoord) {
         const addr = await reverseGeocode(trip.waypoints[0][0], trip.waypoints[0][1])
         if (addr) trip.from = `${addr.split(',')[0]}, ${trip.waypoints[0][0].toFixed(4)},${trip.waypoints[0][1].toFixed(4)}`
