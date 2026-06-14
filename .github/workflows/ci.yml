@@ -29,7 +29,7 @@ jobs:
     needs: lint
     services:
       postgres:
-        image: postgis/postgis:16-3.4
+        image: postgres:16
         env:
           POSTGRES_DB: fleetoss
           POSTGRES_USER: fleetoss
@@ -37,7 +37,7 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready -U fleetoss
+          --health-cmd "pg_isready -U fleetoss"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5

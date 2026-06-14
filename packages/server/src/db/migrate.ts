@@ -5,7 +5,11 @@ async function migrate() {
   const client = await pool.connect();
 
   try {
-    await client.query('CREATE EXTENSION IF NOT EXISTS postgis');
+    try {
+      await client.query('CREATE EXTENSION IF NOT EXISTS postgis');
+    } catch {
+      console.warn('PostGIS extension not available (not installed on this server)');
+    }
     await client.query('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"');
 
     await client.query(`
