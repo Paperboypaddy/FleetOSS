@@ -46,6 +46,7 @@ services:
     restart: unless-stopped
     ports:
       - '4001:4000'
+      - '5055:5055'
     environment:
       NODE_ENV: production
       PORT: '4000'

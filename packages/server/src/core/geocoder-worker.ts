@@ -1,4 +1,5 @@
-import { getRedis } from '../db/redis.js';
+import Redis from 'ioredis';
+import { config } from '../config/index.js';
 import { getDb } from '../db/connection.js';
 import { trips } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
@@ -17,6 +18,23 @@ interface GeocodeJob {
 }
 
 let running = false;
+let workerRedis: Redis | null = null;
+
+function getWorkerRedis(): Redis | null {
+  if (!workerRedis && config.redisUrl) {
+    workerRedis = new Redis(config.redisUrl, {
+      maxRetriesPerRequest: 1,
+      retryStrategy(times) {
+        if (times > 3) return null;
+        return Math.min(times * 200, 2000);
+      },
+      lazyConnect: true,
+    });
+    workerRedis.on('error', () => {});
+    workerRedis.on('close', () => {});
+  }
+  return workerRedis || null;
+}
 
 export function startGeocoderWorker() {
   if (running) return;
@@ -26,13 +44,17 @@ export function startGeocoderWorker() {
 
 export function stopGeocoderWorker() {
   running = false;
+  if (workerRedis) {
+    workerRedis.quit().catch(() => {});
+    workerRedis = null;
+  }
 }
 
 async function poll() {
   while (running) {
-    const redis = getRedis();
+    const redis = getWorkerRedis();
     if (!redis) {
-      await sleep(2000);
+      await sleep(5000);
       continue;
     }
 
