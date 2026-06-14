@@ -1,7 +1,7 @@
 import { getRedis } from '../db/redis.js';
 
 const WINDOW_MS = 60000; // 1 minute
-const MAX_REQUESTS = 60; // 60 requests per minute
+const MAX_REQUESTS = 300; // 300 requests per minute
 const PREFIX = 'ratelimit:';
 
 export async function checkRateLimit(key: string, maxRequests = MAX_REQUESTS): Promise<boolean> {
