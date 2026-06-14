@@ -88,9 +88,11 @@ export default function TripsPanel({ showToast, onShowTrip, trips: tripsProp }: 
                 <td className="px-4 py-2.5 text-xs font-mono whitespace-nowrap">{t.date}</td>
                 <td className="px-4 py-2.5 text-xs">{t.vehicle}</td>
                 <td className="px-4 py-2.5 text-xs">
-                  <div className="flex flex-col gap-0.5 max-w-[200px]">
+                  <div className="flex flex-col gap-0.5 max-w-[240px]">
                     <span className="text-text truncate" title={t.from}>← {t.from}</span>
-                    <span className="text-text truncate" title={t.to}>→ {t.to}</span>
+                    <span className="text-[9px] text-text-dim font-mono truncate">{t.waypoints[0]?.[0]?.toFixed(4)},{t.waypoints[0]?.[1]?.toFixed(4)}</span>
+                    <span className="text-text truncate mt-0.5" title={t.to}>→ {t.to}</span>
+                    <span className="text-[9px] text-text-dim font-mono truncate">{t.waypoints[1]?.[0]?.toFixed(4)},{t.waypoints[1]?.[1]?.toFixed(4)}</span>
                   </div>
                 </td>
                 <td className="px-4 py-2.5 text-xs font-mono whitespace-nowrap">{t.startTime}</td>

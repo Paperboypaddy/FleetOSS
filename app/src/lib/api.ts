@@ -231,11 +231,11 @@ export async function fetchTrips(): Promise<FrontendTrip[]> {
       const endIsCoord = /^-?[\d.]+,\s*-?[\d.]+$/.test(trip.to.trim())
       if (startIsCoord) {
         const addr = await reverseGeocode(trip.waypoints[0][0], trip.waypoints[0][1])
-        if (addr) trip.from = `${addr.split(',')[0]}, ${trip.waypoints[0][0].toFixed(4)},${trip.waypoints[0][1].toFixed(4)}`
+        if (addr) trip.from = addr
       }
       if (endIsCoord) {
         const addr = await reverseGeocode(trip.waypoints[1][0], trip.waypoints[1][1])
-        if (addr) trip.to = `${addr.split(',')[0]}, ${trip.waypoints[1][0].toFixed(4)},${trip.waypoints[1][1].toFixed(4)}`
+        if (addr) trip.to = addr
       }
       // Small delay to respect Nominatim rate limits
       if (startIsCoord || endIsCoord) await new Promise(r => setTimeout(r, 200))
@@ -270,7 +270,17 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string |
     )
     if (!res.ok) return null
     const data = await res.json()
-    return data.display_name || null
+    if (!data?.address) return null
+    const a = data.address
+    // Build a short address: "Street Name, City" or "City, State"
+    const street = [a.house_number, a.road, a.pedestrian].filter(Boolean).join(' ')
+    const city = a.city || a.town || a.village || a.municipality || ''
+    const state = a.state || ''
+    if (street && city) return `${street}, ${city}`
+    if (city && state) return `${city}, ${state}`
+    if (street) return street
+    if (city) return city
+    return data.display_name?.split(',').slice(0, 3).join(',') || null
   } catch {
     return null
   }
