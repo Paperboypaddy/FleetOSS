@@ -24,20 +24,22 @@
 fleetoss/
 ├── app/                    # React SPA dashboard
 │   ├── src/
-│   │   ├── App.tsx              # Shell + panel routing
+│   │   ├── App.tsx              # Shell + panel routing + auth
 │   │   ├── components/
+│   │   │   ├── auth/            # Login/Register page
 │   │   │   ├── layout/          # Sidebar, Topbar
 │   │   │   ├── map/             # Map, playback, device list
 │   │   │   ├── trips/           # Trip table + editing
-│   │   │   ├── maint/           # Maintenance panel
-│   │   │   ├── fuel/            # Fuel tracking
-│   │   │   ├── settings/        # Admin/server stats
+│   │   │   ├── maint/           # Maintenance (placeholder)
+│   │   │   ├── fuel/            # Fuel (placeholder)
+│   │   │   ├── settings/        # Admin panel (General, Users, Devices)
 │   │   │   └── ui/              # Icons, Toast
 │   │   ├── lib/
 │   │   │   ├── api.ts           # REST + WebSocket client
+│   │   │   ├── auth.tsx         # AuthProvider + useAuth hook
 │   │   │   ├── math.ts          # Haversine, etc.
-│   │   │   └── osm.ts           # OSRM routing
-│   │   └── data/mockData.ts     # Fallback data
+│   │   │   └── osm.ts           # OSRM routing (deprecated)
+│   │   └── auth.tsx             # Auth context
 │   └── vite.config.ts           # Vite + Tailwind + API proxy
 ├── packages/
 │   ├── core/                    # Shared TS types
@@ -46,6 +48,7 @@ fleetoss/
 │       └── src/
 │           ├── index.ts         # Entry (dual-port: 4000 + 5055)
 │           ├── config/          # Environment config
+│           ├── auth/            # JWT sign/verify, register, login
 │           ├── db/              # Schema, migrations, repos
 │           ├── ingestion/       # Protocol parsers
 │           │   └── protocols/   # http-json, traccar
@@ -73,3 +76,11 @@ npm run dev
 # Start frontend (separate terminal, port 5173)
 cd app && npm run dev
 ```
+
+## Ports
+
+| Service | Port |
+|---------|------|
+| Backend API | 4000 |
+| Traccar Client | 5055 |
+| Frontend (Vite) | 5173 |

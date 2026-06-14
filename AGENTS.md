@@ -25,6 +25,7 @@ Open Source Fleet & Asset Intelligence Platform — a self-hostable Traccar alte
 ### Agent Change Log
 <!-- Agents log their changes here with date/description -->
 - 2026-06-14 — Device approval flow: `approved` column/flag, unapproved devices hidden from map, Settings → Devices shows "Devices Awaiting Approval" with Add button
+- 2026-06-14 — Custom site name and logo upload in General settings
 - 2026-06-14 — Settings sidebar, user management (create/list/delete), device trip detection toggle, logout button
 - 2026-06-14 — JWT auth with login/register page, protected routes, token management
 - 2026-06-14 — Remove all mock data; Fuel/Maint panels show placeholders
@@ -145,6 +146,7 @@ Frontend has its own types in `app/src/types/index.ts` (older/separate — consi
 - [x] Frontend: Cross-panel trip navigation (click trip → fetch GPS breadcrumbs → show on map)
 - [x] Frontend: WebSocket live position updates on map
 - [x] Frontend: API client with auth headers, fallback to empty arrays on error
+- [x] Frontend: Car icon in sidebar, uploaded logo in topbar
 - [x] Frontend: Collapsible asset sidebar for mobile
 - [x] Frontend: Rename/delete devices inline
 - [x] Frontend: Battery level display, last seen timestamps
@@ -154,6 +156,7 @@ Frontend has its own types in `app/src/types/index.ts` (older/separate — consi
 - [x] Frontend: User management (create with role, list, delete)
 - [x] Frontend: Device settings with trip detection toggle
 - [x] Frontend: Logout button in settings sidebar
+- [x] Frontend: Custom site name and logo upload in General settings
 - [x] Frontend: JWT login/register page, token persisted to localStorage
 - [x] Frontend: Active panel persisted to localStorage across reloads
 - [x] Core: Shared TypeScript types (Device, Position, Trip, Geofence, Event, etc.)
