@@ -148,8 +148,8 @@ export default function SettingsPanel({ showToast }: { showToast: (msg: string) 
 
             <div className="bg-surface border border-border rounded-lg p-4 mb-6">
               <h2 className="text-sm font-semibold mb-3">Branding</h2>
-              <div className="flex flex-col gap-4">
-                <div className="flex items-center gap-3">
+              <div className="flex items-start gap-6 flex-wrap">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
                   <div className="flex flex-col gap-1 flex-1">
                     <label className="text-[10px] text-text-muted">Site Name</label>
                     <input
@@ -169,7 +169,7 @@ export default function SettingsPanel({ showToast }: { showToast: (msg: string) 
                     }}
                   >Reset</button>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
                   <div className="flex flex-col gap-1">
                     <label className="text-[10px] text-text-muted">Logo</label>
                     <div className="flex items-center gap-2">
@@ -193,19 +193,16 @@ export default function SettingsPanel({ showToast }: { showToast: (msg: string) 
                         htmlFor="logo-upload"
                         className="px-3 py-1.5 rounded-lg bg-cyan text-bg text-xs font-semibold cursor-pointer hover:opacity-85 transition-opacity"
                       >Choose File</label>
-                      {logo && (
+                      {logo ? (
                         <button
                           className="px-3 py-1.5 rounded-lg bg-transparent text-red border border-border text-xs cursor-pointer hover:bg-[rgba(239,68,68,0.1)] transition-colors"
                           onClick={() => { setLogo(null); localStorage.removeItem('fleetoss-logo') }}
                         >Remove</button>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                   {logo && (
-                    <div className="flex items-center gap-2 bg-surface-2 border border-border rounded-lg px-3 py-2">
-                      <img src={logo} alt="Logo preview" className="h-8 w-auto max-w-[120px] object-contain" />
-                      <span className="text-[10px] text-text-muted">Preview</span>
-                    </div>
+                    <img src={logo} alt="Logo preview" className="h-10 w-auto max-w-[120px] object-contain bg-surface-2 border border-border rounded-lg p-1.5" />
                   )}
                 </div>
               </div>
