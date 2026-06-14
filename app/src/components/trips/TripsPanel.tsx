@@ -77,7 +77,7 @@ export default function TripsPanel({ showToast, onShowTrip, trips: tripsProp }: 
         <table className="w-full border-collapse">
           <thead>
             <tr>
-              {['Date', 'Vehicle', 'Route', 'Start', 'End', 'Distance', 'Duration', 'Avg Speed', 'Max Speed', 'Type', 'Purpose'].map(h => (
+              {['Date', 'Vehicle', 'Route', 'Start', 'End', 'Distance', 'Duration', 'Avg Speed', 'Max Speed', 'Type', 'Purpose', ''].map(h => (
                 <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-text-muted uppercase tracking-wider border-b border-border sticky top-0 bg-bg whitespace-nowrap">{h}</th>
               ))}
             </tr>
@@ -132,9 +132,17 @@ export default function TripsPanel({ showToast, onShowTrip, trips: tripsProp }: 
                       className="cursor-pointer hover:text-cyan transition-colors truncate block"
                       title={t.purpose || 'Add note...'}
                     >
-                      {t.purpose || <span className="text-text-dim italic">Add note...</span>}
-                    </span>
+                    {t.purpose || <span className="text-text-dim italic">Add note...</span>}
+                  </span>
                   )}
+                </td>
+                <td className="px-4 py-2.5" onClick={e => e.stopPropagation()}>
+                  <a
+                    href={`/api/trips/${t.apiId}/export`}
+                    download
+                    className="text-cyan-dim text-xs hover:text-cyan transition-colors no-underline"
+                    title="Export CSV"
+                  >⬇</a>
                 </td>
               </tr>
             ))}
