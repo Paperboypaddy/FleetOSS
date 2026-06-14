@@ -69,6 +69,22 @@ export interface FrontendDevice {
   speed: number
   battery: number | null
   latlng: [number, number]
+  lastUpdate: string | null // ISO timestamp
+}
+
+export function timeAgo(iso: string | null): string {
+  if (!iso) return 'never'
+  const diff = Date.now() - new Date(iso).getTime()
+  const sec = Math.floor(diff / 1000)
+  if (sec < 10) return 'just now'
+  if (sec < 60) return `${sec}s ago`
+  const min = Math.floor(sec / 60)
+  if (min < 60) return `${min}m ago`
+  const hr = Math.floor(min / 60)
+  if (hr < 24) return `${hr}h ago`
+  const days = Math.floor(hr / 24)
+  if (days < 7) return `${days}d ago`
+  return new Date(iso).toLocaleDateString()
 }
 
 export interface FrontendTrip {
@@ -105,6 +121,7 @@ function mapDevice(api: ApiDevice, latestPosition?: ApiPosition): FrontendDevice
     speed: pos?.speed || 0,
     battery: pos?.batteryLevel ?? null,
     latlng: pos ? [pos.latitude, pos.longitude] : [47.718, -116.945],
+    lastUpdate: pos?.deviceTimestamp || null,
   }
 }
 
@@ -165,6 +182,7 @@ export async function fetchDevices(): Promise<FrontendDevice[]> {
       speed: d.speed,
       battery: null,
       latlng: d.latlng,
+      lastUpdate: null,
     }))
   }
 }

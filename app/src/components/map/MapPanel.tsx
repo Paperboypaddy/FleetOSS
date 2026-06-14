@@ -8,6 +8,7 @@ import DeviceList from './DeviceList';
 import MapInfoCard from './MapInfoCard';
 import type { PlaybackState } from '../../types';
 import type { FrontendDevice, FrontendTrip } from '../../lib/api';
+import { timeAgo } from '../../lib/api';
 
 export interface MapPanelHandle {
   showTripOnMap: (tripIdx: number) => Promise<void>;
@@ -121,7 +122,8 @@ const MapPanel = forwardRef<MapPanelHandle, MapPanelProps>(function MapPanel({ d
           <div style="display:flex;justify-content:space-between;gap:14px;margin-bottom:3px;color:#64748B;font-size:11px"><span>ID</span><span style="font-family:'JetBrains Mono',monospace;color:#E2E8F0">${d.plate}</span></div>
           <div style="display:flex;justify-content:space-between;gap:14px;margin-bottom:3px;color:#64748B;font-size:11px"><span>Status</span><span style="color:${isMoving ? '#00D4FF' : '#F59E0B'}">${isMoving ? 'Moving' : 'Stopped'}</span></div>
           <div style="display:flex;justify-content:space-between;gap:14px;margin-bottom:3px;color:#64748B;font-size:11px"><span>Speed</span><span style="font-family:'JetBrains Mono',monospace;color:#E2E8F0">${d.speed.toFixed(1)} mph</span></div>
-          <div style="display:flex;justify-content:space-between;gap:14px;color:#64748B;font-size:11px"><span>Battery</span><span style="font-family:'JetBrains Mono',monospace;color:${batColor}">${batText}</span></div>`,
+          <div style="display:flex;justify-content:space-between;gap:14px;margin-bottom:3px;color:#64748B;font-size:11px"><span>Battery</span><span style="font-family:'JetBrains Mono',monospace;color:${batColor}">${batText}</span></div>
+          <div style="display:flex;justify-content:space-between;gap:14px;color:#64748B;font-size:11px"><span>Last Update</span><span style="font-family:'JetBrains Mono',monospace;color:#94A3B8">${timeAgo(d.lastUpdate)}</span></div>`,
           { maxWidth: 220 },
         );
       marker.on('click', () => setSelectedDevice(i));

@@ -36,6 +36,7 @@ export default function App() {
             speed: pos.speed || 0,
             battery: pos.batteryLevel ?? d.battery,
             status: (pos.speed && pos.speed > 1 ? 'moving' : d.status) as 'moving' | 'stopped' | 'offline',
+            lastUpdate: pos.deviceTimestamp || new Date().toISOString(),
           }
         })
       })

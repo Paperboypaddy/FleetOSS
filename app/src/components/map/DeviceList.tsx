@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { FrontendDevice } from '../../lib/api';
+import { timeAgo } from '../../lib/api';
 
 interface DeviceListProps {
   devices: FrontendDevice[];
@@ -104,6 +105,9 @@ export default function DeviceList({ devices, selected, onSelect, onRename, onDe
               <span style={{ color: batteryColor(d.battery) }}>
                 {d.battery !== null ? `${Math.round(d.battery)}%` : 'N/A'}
               </span>
+            </div>
+            <div className="font-mono text-[10px] text-text-muted mt-1">
+              Last seen: {timeAgo(d.lastUpdate)}
             </div>
           </div>
         ))}
