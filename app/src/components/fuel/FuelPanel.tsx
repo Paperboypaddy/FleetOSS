@@ -64,7 +64,7 @@ export default function FuelPanel({ showToast }: FuelPanelProps) {
         <div className="p-4 bg-surface border-b border-border flex flex-wrap gap-2 items-end">
           <select className="bg-surface-2 border border-border rounded px-2.5 py-1.5 text-xs text-text outline-none focus:border-cyan w-36" value={form.deviceId} onChange={e => setForm(f => ({ ...f, deviceId: e.target.value }))}>
             <option value="">Select device</option>
-            {devices.map((d: any) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            {devices.filter((d: any) => (d.attributes?.deviceType || '') === 'vehicle').map((d: any) => <option key={d.id} value={d.id}>{d.name}</option>)}
           </select>
           <input className="bg-surface-2 border border-border rounded px-2.5 py-1.5 text-xs text-text outline-none focus:border-cyan w-28" type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
           <input className="bg-surface-2 border border-border rounded px-2.5 py-1.5 text-xs text-text outline-none focus:border-cyan w-20" placeholder="Gallons" type="number" step="0.001" value={form.gallons} onChange={e => setForm(f => ({ ...f, gallons: e.target.value }))} />

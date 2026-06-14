@@ -393,13 +393,14 @@ export default function SettingsPanel({ showToast }: { showToast: (msg: string) 
             <div className="bg-surface border border-border rounded-lg overflow-hidden">
               <table className="w-full border-collapse">
                 <thead><tr>
-                  {['Name', 'ID', 'Status', 'Trip Detection', ''].map(h => (
+                  {['Name', 'ID', 'Status', 'Type', 'Trip Detection', ''].map(h => (
                     <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-text-muted uppercase tracking-wider border-b border-border">{h}</th>
                   ))}
                 </tr></thead>
                 <tbody>
                   {devices.map(d => {
                     const disabled = d.attributes?.skipTripDetection === true
+                    const devType = d.attributes?.deviceType || ''
                     return (
                       <tr key={d.id} className="border-b border-[rgba(46,54,80,0.5)] text-xs">
                         <td className="px-4 py-2.5 font-medium">{d.name}</td>
@@ -409,6 +410,37 @@ export default function SettingsPanel({ showToast }: { showToast: (msg: string) 
                             <span className={`w-1.5 h-1.5 rounded-full ${d.status === 'online' ? 'bg-green' : 'bg-text-muted'}`} />
                             {d.status}
                           </span>
+                        </td>
+                        <td className="px-4 py-2.5" onClick={e => e.stopPropagation()}>
+                          <select
+                            value={devType}
+                            onChange={async e => {
+                              const newType = e.target.value
+                              try {
+                                const res = await authFetch(`/api/devices/${d.id}`, {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ attributes: { deviceType: newType || null } }),
+                                })
+                                if (res.ok) {
+                                  const updated = await res.json()
+                                  setDevices(prev => prev.map(x => x.id === d.id ? updated : x))
+                                  showToast(newType ? `Set as ${newType}` : 'Type cleared')
+                                }
+                              } catch { showToast('Failed to update type') }
+                            }}
+                            className={`px-2 py-0.5 rounded font-mono text-[10px] font-semibold border-none outline-none cursor-pointer ${
+                              devType === 'vehicle' ? 'bg-cyan-dim text-cyan' :
+                              devType === 'phone' ? 'bg-amber-dim text-amber' :
+                              devType === 'asset' ? 'bg-green-dim text-green' :
+                              'bg-surface-2 text-text-muted'
+                            }`}
+                          >
+                            <option value="" className="bg-bg text-text-muted">—</option>
+                            <option value="phone" className="bg-bg text-amber">Phone</option>
+                            <option value="vehicle" className="bg-bg text-cyan">Vehicle</option>
+                            <option value="asset" className="bg-bg text-green">Asset</option>
+                          </select>
                         </td>
                         <td className="px-4 py-2.5">
                           <button
