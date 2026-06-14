@@ -25,6 +25,7 @@ Open Source Fleet & Asset Intelligence Platform — a self-hostable Traccar alte
 ### Agent Change Log
 <!-- Agents log their changes here with date/description -->
 - 2026-06-14 — Device approval flow: `approved` column/flag, unapproved devices hidden from map, Settings → Devices shows "Devices Awaiting Approval" with Add button
+- 2026-06-14 — TK103 + Teltonika Codec 8 protocol parsers on ports 5002, 5056
 - 2026-06-14 — NMEA/GPRMC protocol parser + TCP server on port 5100
 - 2026-06-14 — Custom site name and logo upload in General settings
 - 2026-06-14 — Settings sidebar, user management (create/list/delete), device trip detection toggle, logout button
@@ -181,6 +182,8 @@ Frontend has its own types in `app/src/types/index.ts` (older/separate — consi
 - [x] Server: Port 5055 listener for Traccar Client compatibility
 - [x] Server: NMEA/GPRMC protocol parser + TCP server on port 5100
 - [x] Server: GT06/Concox protocol parser + TCP server on port 5001
+- [x] Server: TK103 protocol parser + TCP server on port 5002
+- [x] Server: Teltonika Codec 8/8E protocol parser + TCP server on port 5056
 - [x] Infrastructure: Docker Compose (PostGIS, MinIO, Redis)
 - [x] Infrastructure: .gitignore (node_modules, dist, .env, *.log)
 
@@ -189,8 +192,8 @@ Frontend has its own types in `app/src/types/index.ts` (older/separate — consi
 ### 1. More protocol parsers
 - [x] NMEA/GPRMC parser + TCP server on port 5100
 - [x] GT06/Concox protocol parser + TCP server on port 5001
-- [ ] TK103 protocol parser (Chinese GPS trackers)
-- [ ] Teltonika protocol parser (#1 protocol globally, 84+ device models)
+- [x] TK103 protocol parser (Chinese GPS trackers) on port 5002
+- [x] Teltonika Codec 8/8E protocol parser on port 5056
 - [ ] Queclink protocol family
 - [ ] OBD-II ELM327 parser (vehicle telemetry)
 - [ ] Document protocol plugin interface
