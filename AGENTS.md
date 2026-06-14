@@ -23,15 +23,17 @@ fleetoss/
 
 **Structure:**
 - `src/types/index.ts` — Frontend-specific types (Device, Trip, MaintItem, FuelEntry, PlaybackState)
-- `src/data/mockData.ts` — Mock data matching the original fleet-tracker.html
+- `src/data/mockData.ts` — Mock data (used as fallback when API is unreachable)
+- `src/lib/api.ts` — API client: fetch devices/trips/positions, WebSocket, rename/delete, reverse geocode
 - `src/lib/math.ts` — Haversine, bearing, speed color, interpolate, etc.
-- `src/lib/osm.ts` — OSRM route fetching for trip playback
+- `src/lib/osm.ts` — OSRM route fetching for trip playback (deprecated — using raw GPS positions now)
 - `src/App.tsx` — Shell: sidebar + topbar + panel routing + toast state
 - `src/components/layout/` — Sidebar.tsx, Topbar.tsx
 - `src/components/map/` — MapPanel.tsx (exposes `showTripOnMap` via ref), PlaybackBar.tsx, DeviceList.tsx, MapInfoCard.tsx
-- `src/components/trips/` — TripsPanel.tsx (filterable table + stats)
+- `src/components/trips/` — TripsPanel.tsx (filterable table + editable type/purpose + geocoded addresses)
 - `src/components/maint/` — MaintPanel.tsx (service items + detail view)
 - `src/components/fuel/` — FuelPanel.tsx (stats, MPG chart, table, log form)
+- `src/components/settings/` — SettingsPanel.tsx (server stats, protocol breakdown, device list)
 - `src/components/ui/` — Icons.tsx (SVG components), Toast.tsx
 
 **Key patterns:**
@@ -39,8 +41,10 @@ fleetoss/
 - Google Fonts: Inter (sans) + JetBrains Mono (mono)
 - Leaflet popups/controls styled dark in `index.css`
 - Trip playback engine lives in PlaybackBar.tsx (ref-based animation loop + local `playing` state)
-- Cross-panel navigation: TripsPanel calls `onShowTrip(idx)`, App switches to map panel and calls `mapRef.current.showTripOnMap(idx)`
+- Cross-panel navigation: TripsPanel calls `onShowTrip(trip)`, App fetches GPS positions and calls `mapRef.current.showTripOnMap(trip, wpts, speeds)`
 - MapPanel uses `forwardRef` + `useImperativeHandle` to expose `showTripOnMap`
+- Active panel persisted to `localStorage` across reloads
+- Live position updates via WebSocket (broadcast from server on ingestion)
 
 **Dev server:** `npm run dev` in `app/` → http://localhost:5173
 
@@ -49,24 +53,30 @@ fleetoss/
 **Stack:** Fastify 5, TypeScript, Drizzle ORM, PostgreSQL 16 + PostGIS 3.4, Zod
 
 **Structure:**
-- `src/index.ts` — Entry point: Fastify server with CORS, WebSocket, health check
+- `src/index.ts` — Entry point: Fastify server with CORS, WebSocket, health check, dual-port (4000 + 5055)
 - `src/config/index.ts` — Environment config (PORT, DATABASE_URL, JWT_SECRET, S3, Redis)
 - `src/db/`
   - `connection.ts` — Drizzle + pg Pool singleton
   - `schema.ts` — Drizzle table definitions (devices, positions, trips, geofences, events)
   - `migrate.ts` — Raw SQL migration (creates PostGIS extension + all tables + indexes)
   - `seed.ts` — Demo data (1 device, 8 positions, 1 trip)
-  - `repositories/device.ts` — findOrCreateDevice, updateDeviceStatus, listDevices, getDeviceById
-  - `repositories/position.ts` — insertPosition, getLatestPosition, getPositions
+  - `backfill-trips.ts` — One-time script to detect trips from existing position data
+  - `repositories/device.ts` — findOrCreateDevice, updateDeviceStatus, listDevices, getDeviceById, updateDeviceName, deleteDeviceById
+  - `repositories/position.ts` — insertPosition, getLatestPosition, getPositions (with date range)
 - `src/ingestion/`
-  - `server.ts` — `POST /api/ingest` and `POST /api/ingest/batch` endpoints
+  - `server.ts` — `POST /api/ingest`, `POST /api/ingest/batch`, `GET/POST /api/ingest/traccar`
   - `protocols/http-json.ts` — Zod-validated parser for HTTP JSON GPS data
+  - `protocols/traccar.ts` — Parser for Traccar/OsmAnd HTTP query-param format
   - Future: `nmea/`, `tk103/`, `obd/` protocol parsers
-- `src/api/routes/devices.ts` — `GET /api/devices`, `GET /api/devices/:id`
+- `src/api/routes/devices.ts` — `GET /api/devices`, `GET /api/devices/:id`, `PATCH /api/devices/:id` (rename), `DELETE /api/devices/:id`
+- `src/api/routes/positions.ts` — `GET /api/devices/:deviceId/positions?from=&to=&limit=`
+- `src/api/routes/trips.ts` — `GET /api/trips`, `GET /api/trips/:id`, `PATCH /api/trips/:id` (type/purpose), `GET /api/devices/:deviceId/trips`
+- `src/api/routes/stats.ts` — `GET /api/stats` (device/position/trip counts, protocol breakdown)
 - `src/realtime/index.ts` — WebSocket at `/ws`, broadcasts positions to connected clients
-- `src/core/trip-detector.ts` — Speed-based trip start/end detection (in-memory state per device)
+- `src/core/trip-detector.ts` — Speed-based trip start/end detection (in-memory state per device, 5-min stop threshold)
 
 **Dev server:** `npm run dev -w packages/server` or `npm run dev` from root → http://localhost:4000
+**Traccar-compatible port:** Also listens on :5055 for Traccar Client apps
 
 **Database:** `docker-compose up` → PostGIS on :5432, then `npm run db:migrate`
 
@@ -95,17 +105,32 @@ Frontend has its own types in `app/src/types/index.ts` (older/separate — consi
 
 ## What's Been Done
 
-- [x] Frontend: Full SPA with Map (Leaflet + OSRM routing + playback), Trips, Maintenance, Fuel panels
-- [x] Frontend: Cross-panel trip navigation (click trip → show on map)
+- [x] Frontend: Full SPA with Map (Leaflet + raw GPS traces + playback), Trips, Maintenance, Fuel panels
+- [x] Frontend: Cross-panel trip navigation (click trip → fetch GPS breadcrumbs → show on map)
+- [x] Frontend: WebSocket live position updates on map
+- [x] Frontend: API client replacing mock data (fallback if API unreachable)
+- [x] Frontend: Collapsible asset sidebar for mobile
+- [x] Frontend: Rename/delete devices inline
+- [x] Frontend: Battery level display, last seen timestamps
+- [x] Frontend: Editable trip type (None/Work/Personal) and purpose
+- [x] Frontend: Auto-geocoded trip addresses from Nominatim
+- [x] Frontend: Settings/Admin panel with server stats
 - [x] Core: Shared TypeScript types (Device, Position, Trip, Geofence, Event, etc.)
 - [x] Server: Fastify scaffold with CORS, WebSocket, health check
 - [x] Server: Database schema (devices, positions, trips, geofences, events) with PostGIS indexes
 - [x] Server: Database migration script + seed data
 - [x] Server: HTTP/JSON ingestion endpoint (single + batch)
-- [x] Server: Device API routes (list, get by ID)
+- [x] Server: Traccar/OsmAnd protocol endpoint (GET/POST with query params)
+- [x] Server: Background Geolocation format support (transistorsoft nested JSON)
+- [x] Server: Device API routes (list, get, rename, delete)
+- [x] Server: Positions API (by device with date range)
+- [x] Server: Trips API (list, get, update type/purpose, by device)
+- [x] Server: Stats API (device/position/trip counts, protocol breakdown)
 - [x] Server: WebSocket real-time position broadcasting
-- [x] Server: Basic trip detection (speed-based start/stop)
+- [x] Server: Trip detection (in-memory, 2 mph threshold, 5-min stop gap)
+- [x] Server: Port 5055 listener for Traccar Client compatibility
 - [x] Infrastructure: Docker Compose (PostGIS, MinIO, Redis)
+- [x] Infrastructure: .gitignore (node_modules, dist, .env, *.log)
 
 ## Next Steps (Priority Order)
 
@@ -115,31 +140,30 @@ Frontend has its own types in `app/src/types/index.ts` (older/separate — consi
 - [ ] Add request logging / request IDs
 - [ ] Implement auth middleware (JWT initially)
 - [ ] Add pagination to list endpoints
-- [ ] Create `.env` file from `.env.example`
 
 ### 2. More protocol parsers
 - [ ] NMEA/GPRMC parser (standard GPS sentence format)
 - [ ] TK103 protocol parser (Chinese GPS trackers)
+- [ ] Teltonika protocol parser (#1 protocol globally)
+- [ ] gt06 protocol parser (Concox, second most common)
 - [ ] OBD-II ELM327 parser (vehicle telemetry)
 - [ ] Document protocol plugin interface
 
 ### 3. Trip detection improvement
-- [ ] Fix: trip-detector.ts `wasMoving` logic needs previous position's moving state, not current
 - [ ] Add ignition-based trip detection
 - [ ] Add geofence-based trip start/end
-- [ ] Add reverse geocoding for start/end addresses
+- [ ] Save geocoded addresses back to trips table
 
 ### 4. API completeness
-- [ ] Trips API: list, get by ID, get by device
-- [ ] Positions API: get by device with date range
 - [ ] Geofences CRUD API
 - [ ] Events API
+- [ ] Maintenance API
+- [ ] Fuel entries API
 
-### 5. Frontend → Backend integration
-- [ ] Replace mock data with API calls
-- [ ] Add WebSocket connection for live positions
-- [ ] Add real-time device status updates on map
-- [ ] Add auth UI (login page)
+### 5. Frontend polish
+- [ ] Auth UI (login page)
+- [ ] Fuel/Maint panels wired to real data
+- [ ] Dark/light theme toggle
 
 ### 6. Infrastructure
 - [ ] Dockerize the server
@@ -167,13 +191,11 @@ docker compose up -d
 # Backend
 cp packages/server/.env.example packages/server/.env
 npm run db:migrate
-npm run dev          # starts server on :4000
+npm run dev          # starts server on :4000 (+ :5055 for Traccar)
 
 # Frontend (separate terminal)
 cd app && npm run dev  # starts on :5173
 
-# Ingest a test position:
-curl -X POST http://localhost:4000/api/ingest \
-  -H 'Content-Type: application/json' \
-  -d '{"deviceId":"test-001","latitude":47.718,"longitude":-116.945,"speed":34,"timestamp":"2026-06-13T12:00:00Z"}'
+# Ingest a test position via Traccar protocol:
+curl "http://localhost:5055/?id=test-001&lat=47.718&lon=-116.945&speed=34"
 ```

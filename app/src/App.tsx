@@ -13,7 +13,14 @@ import { fetchDevices, fetchTrips, connectWebSocket, renameDevice, deleteDevice,
 import type { FrontendDevice, FrontendTrip, ApiPosition, TripPoint } from './lib/api';
 
 export default function App() {
-  const [activePanel, setActivePanel] = useState<PanelId>('map');
+  const [activePanel, setActivePanel] = useState<PanelId>(() => {
+    const saved = localStorage.getItem('fleetoss-panel')
+    return (saved === 'map' || saved === 'trips' || saved === 'maint' || saved === 'fuel' || saved === 'settings') ? saved : 'map'
+  });
+
+  useEffect(() => {
+    localStorage.setItem('fleetoss-panel', activePanel)
+  }, [activePanel])
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [devices, setDevices] = useState<FrontendDevice[] | null>(null);
   const [trips, setTrips] = useState<FrontendTrip[] | null>(null);
