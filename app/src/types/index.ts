@@ -22,7 +22,7 @@ export interface Trip {
   startSpeed: number;
   endSpeed: number;
   startTime: string;
-  type: 'Work' | 'Personal';
+  type: 'Work' | 'Personal' | null;
   purpose: string;
   waypoints: [number, number][];
 }

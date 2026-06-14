@@ -12,7 +12,7 @@ import LoginPage from './components/auth/LoginPage';
 import { AuthProvider, useAuth } from './lib/auth';
 import type { PanelId } from './types';
 import { fetchDevices, fetchTrips, connectWebSocket, renameDevice, deleteDevice, fetchTripPositions } from './lib/api';
-import type { FrontendDevice, FrontendTrip, ApiPosition, TripPoint } from './lib/api';
+import type { FrontendDevice, FrontendTrip, ApiPosition } from './lib/api';
 
 function getInitialTheme(): 'dark' | 'light' {
   const saved = localStorage.getItem('fleetoss-theme')
@@ -25,7 +25,6 @@ function getInitialColorTheme(): string {
 }
 
 function AppContent() {
-  const { user, loading } = useAuth()
   const [activePanel, setActivePanel] = useState<PanelId>(() => {
     const saved = localStorage.getItem('fleetoss-panel')
     return (saved === 'map' || saved === 'trips' || saved === 'maint' || saved === 'fuel' || saved === 'settings') ? saved : 'map'

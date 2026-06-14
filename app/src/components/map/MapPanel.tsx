@@ -115,7 +115,6 @@ const MapPanel = forwardRef<MapPanelHandle, MapPanelProps>(function MapPanel({ d
   const [mapStyle, setMapStyle] = useState<MapStyleId>('osm')
   const [showLayers, setShowLayers] = useState(false)
   const deviceArr = devicesProp || []
-  const tripsArr = tripsProp || []
 
   // Close layers dropdown on outside click
   useEffect(() => {

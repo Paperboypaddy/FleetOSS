@@ -1,4 +1,3 @@
-const API = '/api'
 const WS = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws`
 
 function authHeaders(): Record<string, string> {
