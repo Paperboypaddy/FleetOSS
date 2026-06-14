@@ -1,6 +1,24 @@
 const API = '/api'
 const WS = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws`
 
+function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem('fleetoss-token')
+  return token ? { 'Authorization': `Bearer ${token}` } : {}
+}
+
+async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
+  const res = await apiFetch(`${path}`, {
+    ...options,
+    headers: { ...options.headers, ...authHeaders() } as Record<string, string>,
+  })
+  if (res.status === 401) {
+    localStorage.removeItem('fleetoss-token')
+    localStorage.removeItem('fleetoss-user')
+    window.location.reload()
+  }
+  return res
+}
+
 export interface ApiDevice {
   id: string
   name: string
@@ -169,14 +187,14 @@ function mapTrip(api: ApiTrip, deviceName: string): FrontendTrip {
 
 export async function fetchDevices(): Promise<FrontendDevice[]> {
   try {
-    const res = await fetch(`${API}/devices`)
+    const res = await apiFetch(`/devices`)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const data: ApiDevice[] = await res.json()
     const result: FrontendDevice[] = []
     for (const d of data) {
       let latestPos: ApiPosition | undefined
       try {
-        const posRes = await fetch(`${API}/devices/${d.id}/positions?limit=1`)
+        const posRes = await apiFetch(`/devices/${d.id}/positions?limit=1`)
         if (posRes.ok) {
           const positions: ApiPosition[] = await posRes.json()
           latestPos = positions[0]
@@ -202,7 +220,7 @@ export async function fetchDevices(): Promise<FrontendDevice[]> {
 }
 
 export async function renameDevice(deviceId: string, name: string): Promise<void> {
-  const res = await fetch(`${API}/devices/${deviceId}`, {
+  const res = await apiFetch(`/devices/${deviceId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name }),
@@ -211,16 +229,16 @@ export async function renameDevice(deviceId: string, name: string): Promise<void
 }
 
 export async function deleteDevice(deviceId: string): Promise<void> {
-  const res = await fetch(`${API}/devices/${deviceId}`, { method: 'DELETE' })
+  const res = await apiFetch(`/devices/${deviceId}`, { method: 'DELETE' })
   if (!res.ok) throw new Error(`Failed to delete: ${res.status}`)
 }
 
 export async function fetchTrips(): Promise<FrontendTrip[]> {
   try {
-    const res = await fetch(`${API}/trips`)
+    const res = await apiFetch(`/trips`)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const data: ApiTrip[] = await res.json()
-    const deviceRes = await fetch(`${API}/devices`)
+    const deviceRes = await apiFetch(`/devices`)
     const devices: ApiDevice[] = deviceRes.ok ? await deviceRes.json() : []
     const nameMap = new Map(devices.map(d => [d.id, d.name]))
     return data.map(t => mapTrip(t, nameMap.get(t.deviceId) || t.deviceId))
@@ -237,7 +255,7 @@ export interface TripPoint {
 }
 
 export async function updateTrip(tripId: string, data: { type?: string; purpose?: string }): Promise<void> {
-  await fetch(`${API}/trips/${tripId}`, {
+  await apiFetch(`/trips/${tripId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -272,7 +290,7 @@ export async function fetchTripPositions(deviceId: string, from: string, to: str
   try {
     const fromParam = encodeURIComponent(from)
     const toParam = encodeURIComponent(to)
-    const res = await fetch(`${API}/devices/${deviceId}/positions?from=${fromParam}&to=${toParam}&limit=1000`)
+    const res = await apiFetch(`/devices/${deviceId}/positions?from=${fromParam}&to=${toParam}&limit=1000`)
     if (!res.ok) return []
     const positions: ApiPosition[] = await res.json()
     return positions.reverse().map(p => ({

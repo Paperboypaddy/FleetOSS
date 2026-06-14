@@ -6,6 +6,7 @@ import { registerIngestionRoutes, handleTraccarIngest } from './ingestion/server
 import { registerDeviceRoutes } from './api/routes/devices.js';
 import { registerPositionRoutes } from './api/routes/positions.js';
 import { registerTripRoutes } from './api/routes/trips.js';
+import { registerAuthRoutes } from './auth/index.js';
 import { registerStatsRoutes } from './api/routes/stats.js';
 import { registerRealtime } from './realtime/index.js';
 import { getPool } from './db/connection.js';
@@ -32,6 +33,7 @@ async function main() {
   app.post('/', handleTraccarIngest);
 
   // Routes
+  registerAuthRoutes(app);
   registerIngestionRoutes(app);
   registerDeviceRoutes(app);
   registerPositionRoutes(app);

@@ -8,11 +8,14 @@ import MaintPanel from './components/maint/MaintPanel';
 import FuelPanel from './components/fuel/FuelPanel';
 import SettingsPanel from './components/settings/SettingsPanel';
 import Toast from './components/ui/Toast';
+import LoginPage from './components/auth/LoginPage';
+import { AuthProvider, useAuth } from './lib/auth';
 import type { PanelId } from './types';
 import { fetchDevices, fetchTrips, connectWebSocket, renameDevice, deleteDevice, fetchTripPositions } from './lib/api';
 import type { FrontendDevice, FrontendTrip, ApiPosition, TripPoint } from './lib/api';
 
-export default function App() {
+function AppContent() {
+  const { user, loading } = useAuth()
   const [activePanel, setActivePanel] = useState<PanelId>(() => {
     const saved = localStorage.getItem('fleetoss-panel')
     return (saved === 'map' || saved === 'trips' || saved === 'maint' || saved === 'fuel' || saved === 'settings') ? saved : 'map'
@@ -109,4 +112,19 @@ export default function App() {
       <Toast message={toastMsg} onDone={() => setToastMsg(null)} />
     </div>
   );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppInner />
+    </AuthProvider>
+  )
+}
+
+function AppInner() {
+  const { user, loading } = useAuth()
+  if (loading) return null
+  if (!user) return <LoginPage />
+  return <AppContent />
 }

@@ -73,6 +73,15 @@ export const geofences = pgTable('geofences', {
   attributes: jsonb('attributes').default({}).notNull(),
 });
 
+export const users = pgTable('users', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  email: text('email').notNull().unique(),
+  name: text('name').notNull(),
+  passwordHash: text('password_hash').notNull(),
+  role: text('role', { enum: ['admin', 'manager', 'viewer'] }).default('admin').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const events = pgTable('events', {
   id: uuid('id').defaultRandom().primaryKey(),
   deviceId: uuid('device_id').notNull().references(() => devices.id, { onDelete: 'cascade' }),
