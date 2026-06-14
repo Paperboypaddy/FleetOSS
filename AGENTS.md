@@ -128,6 +128,8 @@ Frontend has its own types in `app/src/types/index.ts` (older/separate — consi
 - [x] Server: Stats API (device/position/trip counts, protocol breakdown)
 - [x] Server: WebSocket real-time position broadcasting
 - [x] Server: Trip detection (in-memory, 2 mph threshold, 5-min stop gap)
+- [x] Server: Server-side reverse geocoding via Nominatim for trip addresses
+- [x] Server: Geocoded addresses saved to trips table at detection time
 - [x] Server: Port 5055 listener for Traccar Client compatibility
 - [x] Infrastructure: Docker Compose (PostGIS, MinIO, Redis)
 - [x] Infrastructure: .gitignore (node_modules, dist, .env, *.log)
@@ -152,7 +154,7 @@ Frontend has its own types in `app/src/types/index.ts` (older/separate — consi
 ### 3. Trip detection improvement
 - [ ] Add ignition-based trip detection
 - [ ] Add geofence-based trip start/end
-- [ ] Save geocoded addresses back to trips table
+- [x] Save geocoded addresses back to trips table
 
 ### 4. API completeness
 - [ ] Geofences CRUD API
