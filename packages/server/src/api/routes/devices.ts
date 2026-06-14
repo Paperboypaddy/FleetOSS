@@ -1,4 +1,7 @@
 import type { FastifyInstance } from 'fastify';
+import { eq } from 'drizzle-orm';
+import { getDb } from '../../db/connection.js';
+import { devices } from '../../db/schema.js';
 import { listDevices, getDeviceById, updateDeviceName, deleteDeviceById } from '../../db/repositories/device.js';
 
 export function registerDeviceRoutes(app: FastifyInstance) {
@@ -13,17 +16,22 @@ export function registerDeviceRoutes(app: FastifyInstance) {
     return reply.send(device);
   });
 
-  // Rename a device
-  app.patch<{ Params: { id: string }; Body: { name: string } }>('/api/devices/:id', async (request, reply) => {
+  // Update a device (rename, set attributes)
+  app.patch<{ Params: { id: string }; Body: { name?: string; attributes?: Record<string, unknown> } }>('/api/devices/:id', async (request, reply) => {
     try {
-      const { name } = request.body;
-      if (!name || typeof name !== 'string' || name.trim().length === 0) {
-        return reply.code(400).send({ error: 'Name is required' });
+      const db = getDb();
+      const existing = await getDeviceById(request.params.id);
+      if (!existing) return reply.code(404).send({ error: 'Device not found' });
+
+      const updates: Record<string, any> = { updatedAt: new Date() };
+      if (request.body.name?.trim()) updates.name = request.body.name.trim();
+      if (request.body.attributes) {
+        updates.attributes = { ...(existing.attributes || {}), ...request.body.attributes };
       }
-      const device = await updateDeviceName(request.params.id, name.trim());
-      return reply.send(device);
+      const result = await db.update(devices).set(updates).where(eq(devices.id, request.params.id)).returning();
+      return reply.send(result[0]);
     } catch (err: any) {
-      request.log.error(err, 'Failed to rename device');
+      request.log.error(err, 'Failed to update device');
       return reply.code(500).send({ error: 'Internal server error' });
     }
   });

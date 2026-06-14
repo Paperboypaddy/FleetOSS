@@ -1,6 +1,6 @@
 import type { Position } from '@fleetoss/core';
 import { getDb } from '../db/connection.js';
-import { trips } from '../db/schema.js';
+import { trips, devices } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 import { reverseGeocode } from './geocode.js';
 
@@ -20,6 +20,12 @@ interface DeviceTripState {
 const deviceState = new Map<string, DeviceTripState>();
 
 export async function detectTrip(deviceId: string, position: Position) {
+  // Check if this device has trip detection disabled
+  const db = getDb();
+  const devResult = await db.select({ attributes: devices.attributes }).from(devices).where(eq(devices.id, deviceId)).limit(1);
+  const devAttrs = (devResult[0]?.attributes || {}) as Record<string, any>;
+  if (devAttrs.skipTripDetection === true) return;
+
   let state = deviceState.get(deviceId);
   const speed = position.speed || 0;
   const isMoving = speed > MOVING_SPEED_THRESHOLD;

@@ -114,7 +114,11 @@ Frontend has its own types in `app/src/types/index.ts` (older/separate — consi
 - [x] Frontend: Battery level display, last seen timestamps
 - [x] Frontend: Editable trip type (None/Work/Personal) and purpose
 - [x] Frontend: Auto-geocoded trip addresses from Nominatim
-- [x] Frontend: Settings/Admin panel with server stats
+- [x] Frontend: Settings/Admin panel with sidebar, user management, device config
+- [x] Frontend: Logout button in settings sidebar
+- [x] Server: User management API (list, create, delete users)
+- [x] Server: Device-level trip detection toggle (skipTripDetection attribute)
+- [x] Server: Trip detector respects per-device skipTripDetection flag
 - [x] Core: Shared TypeScript types (Device, Position, Trip, Geofence, Event, etc.)
 - [x] Server: Fastify scaffold with CORS, WebSocket, health check
 - [x] Server: Database schema (devices, positions, trips, geofences, events) with PostGIS indexes

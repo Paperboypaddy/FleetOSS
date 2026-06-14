@@ -7,6 +7,7 @@ import { registerDeviceRoutes } from './api/routes/devices.js';
 import { registerPositionRoutes } from './api/routes/positions.js';
 import { registerTripRoutes } from './api/routes/trips.js';
 import { registerAuthRoutes } from './auth/index.js';
+import { registerUserRoutes } from './api/routes/users.js';
 import { registerStatsRoutes } from './api/routes/stats.js';
 import { registerRealtime } from './realtime/index.js';
 import { getPool } from './db/connection.js';
@@ -38,6 +39,7 @@ async function main() {
   registerDeviceRoutes(app);
   registerPositionRoutes(app);
   registerTripRoutes(app);
+  registerUserRoutes(app);
   registerStatsRoutes(app);
   registerRealtime(app);
 

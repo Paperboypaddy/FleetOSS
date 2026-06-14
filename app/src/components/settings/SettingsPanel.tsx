@@ -1,125 +1,299 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react'
+import { getAuthToken } from '../../lib/auth'
 
 interface ServerStats {
-  devices: number
-  positions: number
-  trips: number
-  onlineDevices: number
+  devices: number; positions: number; trips: number; onlineDevices: number
   lastPosition: string | null
   byProtocol: { protocol: string; count: number }[]
   server: { port: number; traccarPort: number; uptime: number }
 }
 
-interface SettingsPanelProps {
-  showToast: (msg: string) => void
+interface User { id: string; email: string; name: string; role: string; createdAt: string }
+interface Device {
+  id: string; name: string; uniqueId: string; status: string; attributes: Record<string, any>
+  plate?: string | null
 }
 
-export default function SettingsPanel({ showToast }: SettingsPanelProps) {
+type SettingsTab = 'general' | 'users' | 'devices'
+
+function authFetch(path: string, options: RequestInit = {}) {
+  const headers: Record<string, string> = { ...(options.headers as Record<string, string> || {}) }
+  const token = getAuthToken()
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  return fetch(path, { ...options, headers })
+}
+
+export default function SettingsPanel({ showToast }: { showToast: (msg: string) => void }) {
+  const [tab, setTab] = useState<SettingsTab>('general')
   const [stats, setStats] = useState<ServerStats | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [devices, setDevices] = useState<any[]>([])
+  const [users, setUsers] = useState<User[]>([])
+  const [devices, setDevices] = useState<Device[]>([])
+  const [newUser, setNewUser] = useState({ email: '', name: '', password: '', role: 'viewer' })
+  const [creating, setCreating] = useState(false)
 
   useEffect(() => {
-    fetch('/api/stats')
-      .then(r => r.json())
-      .then(setStats)
-      .catch(() => {})
-      .finally(() => setLoading(false))
-    fetch('/api/devices')
-      .then(r => r.json())
-      .then(setDevices)
-      .catch(() => {})
+    fetch('/api/stats').then(r => r.json()).then(setStats).catch(() => {})
+    authFetch('/api/users').then(r => r.ok ? r.json() : []).then(setUsers).catch(() => {})
+    fetch('/api/devices').then(r => r.json()).then(setDevices).catch(() => {})
   }, [])
 
-  const fmtUptime = (s: number) => {
-    const h = Math.floor(s / 3600)
-    const m = Math.floor((s % 3600) / 60)
-    return `${h}h ${m}m`
+  const createUser = async () => {
+    if (!newUser.email || !newUser.name || !newUser.password) return
+    setCreating(true)
+    try {
+      const res = await authFetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newUser),
+      })
+      if (res.ok) {
+        const u = await res.json()
+        setUsers(prev => [...prev, u])
+        setNewUser({ email: '', name: '', password: '', role: 'viewer' })
+        showToast(`Created ${u.name}`)
+      } else {
+        const err = await res.json()
+        showToast(err.error || 'Failed')
+      }
+    } catch { showToast('Failed to create user') }
+    setCreating(false)
   }
 
-  const fmtTime = (iso: string | null) => {
-    if (!iso) return 'N/A'
-    const d = new Date(iso)
-    return d.toLocaleString()
+  const deleteUser = async (id: string) => {
+    if (!confirm('Delete this user?')) return
+    try {
+      const res = await authFetch(`/api/users/${id}`, { method: 'DELETE' })
+      if (res.ok || res.status === 204) {
+        setUsers(prev => prev.filter(u => u.id !== id))
+        showToast('User deleted')
+      }
+    } catch { showToast('Failed to delete user') }
   }
+
+  const toggleTripDetection = async (device: Device) => {
+    const current = device.attributes?.skipTripDetection === true
+    try {
+      const res = await authFetch(`/api/devices/${device.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ attributes: { skipTripDetection: !current } }),
+      })
+      if (res.ok) {
+        const updated = await res.json()
+        setDevices(prev => prev.map(d => d.id === device.id ? updated : d))
+        showToast(!current ? 'Trip detection disabled' : 'Trip detection enabled')
+      }
+    } catch { showToast('Failed to update device') }
+  }
+
+  const tabs: { id: SettingsTab; label: string }[] = [
+    { id: 'general', label: 'General' },
+    { id: 'users', label: 'Users' },
+    { id: 'devices', label: 'Devices' },
+  ]
+
+  const fmtUptime = (s: number) => `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`
 
   return (
-    <div id="panel-settings" className="flex w-full h-full overflow-y-auto">
-      <div className="flex-1 p-6 max-w-4xl">
-        <h1 className="text-lg font-semibold mb-1">Settings & Admin</h1>
-        <p className="text-xs text-text-muted mb-6">Server status and management</p>
+    <div id="panel-settings" className="flex w-full h-full">
+      {/* Sidebar */}
+      <div className="w-44 bg-surface border-r border-border flex flex-col shrink-0">
+        <div className="px-4 py-3 border-b border-border">
+          <span className="text-xs font-semibold text-text-dim uppercase tracking-wider">Settings</span>
+        </div>
+        <div className="flex-1 flex flex-col p-2">
+          <div className="flex-1 space-y-0.5">
+            {tabs.map(t => (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                  tab === t.id ? 'bg-cyan-dim text-cyan' : 'text-text-muted hover:bg-surface-2 hover:text-text-dim'
+                }`}
+              >{t.label}</button>
+            ))}
+          </div>
+          <button
+            onClick={() => { localStorage.removeItem('fleetoss-token'); localStorage.removeItem('fleetoss-user'); window.location.reload() }}
+            className="w-full text-left px-3 py-2 rounded-lg text-xs font-medium text-red hover:bg-[rgba(239,68,68,0.1)] transition-colors cursor-pointer mt-auto"
+          >Logout</button>
+        </div>
+      </div>
 
-        {loading ? (
-          <div className="text-sm text-text-muted">Loading...</div>
-        ) : stats ? (
-          <>
-            {/* Stats Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-              {[
-                { label: 'Devices', val: stats.devices, color: 'text-cyan' },
-                { label: 'Positions', val: stats.positions.toLocaleString(), color: 'text-green' },
-                { label: 'Trips', val: stats.trips, color: 'text-amber' },
-                { label: 'Online', val: stats.onlineDevices, color: 'text-green' },
-              ].map((s, i) => (
-                <div key={i} className="bg-surface border border-border rounded-lg p-3.5">
-                  <div className="text-[11px] text-text-muted mb-1 uppercase tracking-wider">{s.label}</div>
-                  <div className={`font-mono text-lg font-bold ${s.color}`}>{s.val}</div>
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto">
+        {tab === 'general' && (
+          <div className="p-6">
+            <h1 className="text-lg font-semibold mb-1">General</h1>
+            <p className="text-xs text-text-muted mb-6">Server status and information</p>
+            {stats ? (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                  {[
+                    { label: 'Devices', val: stats.devices, color: 'text-cyan' },
+                    { label: 'Positions', val: stats.positions.toLocaleString(), color: 'text-green' },
+                    { label: 'Trips', val: stats.trips, color: 'text-amber' },
+                    { label: 'Online', val: stats.onlineDevices, color: 'text-green' },
+                  ].map((s, i) => (
+                    <div key={i} className="bg-surface border border-border rounded-lg p-3.5">
+                      <div className="text-[11px] text-text-muted mb-1 uppercase tracking-wider">{s.label}</div>
+                      <div className={`font-mono text-lg font-bold ${s.color}`}>{s.val}</div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-
-            {/* Server Info */}
-            <div className="bg-surface border border-border rounded-lg p-4 mb-6">
-              <h2 className="text-sm font-semibold mb-3">Server</h2>
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div><span className="text-text-muted">API Port:</span> <span className="font-mono ml-2">{stats.server.port}</span></div>
-                <div><span className="text-text-muted">Traccar Port:</span> <span className="font-mono ml-2">{stats.server.traccarPort}</span></div>
-                <div><span className="text-text-muted">Uptime:</span> <span className="font-mono ml-2">{fmtUptime(stats.server.uptime)}</span></div>
-                <div><span className="text-text-muted">Last Position:</span> <span className="font-mono ml-2">{fmtTime(stats.lastPosition)}</span></div>
-              </div>
-            </div>
-
-            {/* Protocol Breakdown */}
-            <div className="bg-surface border border-border rounded-lg p-4 mb-6">
-              <h2 className="text-sm font-semibold mb-3">Ingestion Protocols</h2>
-              <div className="space-y-1.5">
-                {stats.byProtocol.map((p, i) => {
-                  const maxCount = Math.max(...stats.byProtocol.map(x => x.count))
-                  const pct = (p.count / maxCount) * 100
-                  return (
-                    <div key={i} className="flex items-center gap-3 text-xs">
-                      <span className="w-32 text-text-muted truncate">{p.protocol}</span>
-                      <div className="flex-1 h-4 bg-border rounded overflow-hidden">
-                        <div className="h-full bg-cyan rounded transition-all" style={{ width: `${pct}%` }} />
-                      </div>
-                      <span className="font-mono w-16 text-right text-text">{p.count}</span>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Device Management */}
-            <div className="bg-surface border border-border rounded-lg p-4 mb-6">
-              <h2 className="text-sm font-semibold mb-3">Devices</h2>
-              <div className="space-y-1 max-h-[300px] overflow-y-auto">
-                {devices.map((d: any) => (
-                  <div key={d.id} className="flex items-center justify-between py-1.5 border-b border-[rgba(46,54,80,0.5)] last:border-0 text-xs">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${d.status === 'online' ? 'bg-green' : 'bg-text-muted'}`} />
-                      <span className="font-medium">{d.name}</span>
-                      <span className="text-text-muted font-mono">({d.uniqueId})</span>
-                    </div>
-                    <span className={`font-mono ${d.status === 'online' ? 'text-green' : 'text-text-muted'}`}>{d.status}</span>
+                <div className="bg-surface border border-border rounded-lg p-4 mb-6">
+                  <h2 className="text-sm font-semibold mb-3">Server</h2>
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div><span className="text-text-muted">API Port:</span> <span className="font-mono ml-2">{stats.server.port}</span></div>
+                    <div><span className="text-text-muted">Traccar Port:</span> <span className="font-mono ml-2">{stats.server.traccarPort}</span></div>
+                    <div><span className="text-text-muted">Uptime:</span> <span className="font-mono ml-2">{fmtUptime(stats.server.uptime)}</span></div>
+                    <div><span className="text-text-muted">Last Position:</span> <span className="font-mono ml-2">{stats.lastPosition ? new Date(stats.lastPosition).toLocaleString() : 'N/A'}</span></div>
                   </div>
-                ))}
+                </div>
+                <div className="bg-surface border border-border rounded-lg p-4">
+                  <h2 className="text-sm font-semibold mb-3">Protocols</h2>
+                  <div className="space-y-1.5">
+                    {stats.byProtocol.map((p, i) => {
+                      const maxCount = Math.max(...stats.byProtocol.map(x => x.count))
+                      return (
+                        <div key={i} className="flex items-center gap-3 text-xs">
+                          <span className="w-32 text-text-muted truncate">{p.protocol}</span>
+                          <div className="flex-1 h-4 bg-border rounded overflow-hidden">
+                            <div className="h-full bg-cyan rounded" style={{ width: `${(p.count / maxCount) * 100}%` }} />
+                          </div>
+                          <span className="font-mono w-16 text-right text-text">{p.count}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </>
+            ) : <p className="text-text-muted text-sm">Loading...</p>}
+          </div>
+        )}
+
+        {tab === 'users' && (
+          <div className="p-6">
+            <h1 className="text-lg font-semibold mb-1">Users</h1>
+            <p className="text-xs text-text-muted mb-4">Manage who can access FleetOSS</p>
+
+            {/* Create user */}
+            <div className="bg-surface border border-border rounded-lg p-4 mb-6">
+              <h2 className="text-sm font-semibold mb-3">Add User</h2>
+              <div className="flex flex-wrap gap-2 items-end">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] text-text-muted">Email</label>
+                  <input className="bg-surface-2 border border-border rounded px-2.5 py-1.5 text-xs text-text outline-none focus:border-cyan w-44" type="email" value={newUser.email} onChange={e => setNewUser(p => ({ ...p, email: e.target.value }))} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] text-text-muted">Name</label>
+                  <input className="bg-surface-2 border border-border rounded px-2.5 py-1.5 text-xs text-text outline-none focus:border-cyan w-36" value={newUser.name} onChange={e => setNewUser(p => ({ ...p, name: e.target.value }))} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] text-text-muted">Password</label>
+                  <input className="bg-surface-2 border border-border rounded px-2.5 py-1.5 text-xs text-text outline-none focus:border-cyan w-32" type="password" value={newUser.password} onChange={e => setNewUser(p => ({ ...p, password: e.target.value }))} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] text-text-muted">Role</label>
+                  <select className="bg-surface-2 border border-border rounded px-2.5 py-1.5 text-xs text-text outline-none focus:border-cyan w-24" value={newUser.role} onChange={e => setNewUser(p => ({ ...p, role: e.target.value }))}>
+                    <option value="viewer">Viewer</option>
+                    <option value="manager">Manager</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+                <button className="px-3.5 py-1.5 rounded-lg bg-cyan text-bg text-xs font-semibold border-none cursor-pointer hover:opacity-85 disabled:opacity-50" disabled={creating} onClick={createUser}>Add</button>
               </div>
             </div>
-          </>
-        ) : (
-          <div className="text-sm text-red">Failed to load server stats</div>
+
+            {/* User list */}
+            <div className="bg-surface border border-border rounded-lg overflow-hidden">
+              <table className="w-full border-collapse">
+                <thead><tr>
+                  {['Name', 'Email', 'Role', 'Created', ''].map(h => (
+                    <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-text-muted uppercase tracking-wider border-b border-border">{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody>
+                  {users.map(u => (
+                    <tr key={u.id} className="border-b border-[rgba(46,54,80,0.5)] text-xs">
+                      <td className="px-4 py-2.5 font-medium">{u.name}</td>
+                      <td className="px-4 py-2.5 text-text-muted">{u.email}</td>
+                      <td className="px-4 py-2.5">
+                        <span className={`px-2 py-0.5 rounded font-mono text-[10px] font-semibold ${
+                          u.role === 'admin' ? 'bg-cyan-dim text-cyan' : u.role === 'manager' ? 'bg-amber-dim text-amber' : 'bg-surface-2 text-text-muted'
+                        }`}>{u.role}</span>
+                      </td>
+                      <td className="px-4 py-2.5 text-text-muted font-mono">{new Date(u.createdAt).toLocaleDateString()}</td>
+                      <td className="px-4 py-2.5">
+                        <button className="text-red text-[11px] bg-transparent border-none cursor-pointer hover:underline" onClick={() => deleteUser(u.id)}>Delete</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {tab === 'devices' && (
+          <div className="p-6">
+            <h1 className="text-lg font-semibold mb-1">Devices</h1>
+            <p className="text-xs text-text-muted mb-4">Configure device-level settings</p>
+            <div className="bg-surface border border-border rounded-lg overflow-hidden">
+              <table className="w-full border-collapse">
+                <thead><tr>
+                  {['Name', 'ID', 'Status', 'Trip Detection', ''].map(h => (
+                    <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-text-muted uppercase tracking-wider border-b border-border">{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody>
+                  {devices.map(d => {
+                    const disabled = d.attributes?.skipTripDetection === true
+                    return (
+                      <tr key={d.id} className="border-b border-[rgba(46,54,80,0.5)] text-xs">
+                        <td className="px-4 py-2.5 font-medium">{d.name}</td>
+                        <td className="px-4 py-2.5 text-text-muted font-mono">{d.uniqueId}</td>
+                        <td className="px-4 py-2.5">
+                          <span className={`inline-flex items-center gap-1.5 ${d.status === 'online' ? 'text-green' : 'text-text-muted'}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${d.status === 'online' ? 'bg-green' : 'bg-text-muted'}`} />
+                            {d.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <button
+                            onClick={() => toggleTripDetection(d)}
+                            className={`relative w-9 h-5 rounded-full transition-colors cursor-pointer border-none ${
+                              disabled ? 'bg-amber' : 'bg-cyan'
+                            }`}
+                          >
+                            <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-bg shadow transition-transform ${
+                              disabled ? 'translate-x-[18px]' : 'translate-x-0.5'
+                            }`} />
+                          </button>
+                          <span className="ml-2 text-text-muted font-mono text-[10px]">{disabled ? 'Disabled' : 'Active'}</span>
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <button
+                            className="text-red text-[11px] bg-transparent border-none cursor-pointer hover:underline"
+                            onClick={async () => {
+                              if (!confirm(`Remove "${d.name}"?`)) return
+                              try {
+                                await authFetch(`/api/devices/${d.id}`, { method: 'DELETE' })
+                                setDevices(prev => prev.filter(x => x.id !== d.id))
+                                showToast('Device removed')
+                              } catch { showToast('Failed') }
+                            }}
+                          >Remove</button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
         )}
       </div>
     </div>
-  );
+  )
 }
