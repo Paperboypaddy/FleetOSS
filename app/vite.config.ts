@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     host: '0.0.0.0',
+    allowedHosts: ['fleetoss.phnet.xyz', '.phnet.xyz'],
     proxy: {
       '/api': 'http://localhost:4000',
       '/ws': {

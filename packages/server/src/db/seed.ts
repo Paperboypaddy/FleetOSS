@@ -8,8 +8,8 @@ async function seed() {
   try {
     // Create a demo device
     const device = await client.query(`
-      INSERT INTO devices (name, unique_id, plate, status) 
-      VALUES ('T1N Sprinter', 't1n-sprinter-001', 'ABC-1234', 'online')
+      INSERT INTO devices (name, unique_id, plate, status, approved) 
+      VALUES ('T1N Sprinter', 't1n-sprinter-001', 'ABC-1234', 'online', true)
       RETURNING id
     `);
     const deviceId = device.rows[0].id;

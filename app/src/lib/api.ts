@@ -1,7 +1,5 @@
 const API = '/api'
-// Connect WebSocket directly to the backend (not through Vite proxy)
-const BACKEND_PORT = 4000
-const WS = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.hostname}:${BACKEND_PORT}/ws`
+const WS = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws`
 
 function authHeaders(): Record<string, string> {
   const token = localStorage.getItem('fleetoss-token')
@@ -9,7 +7,7 @@ function authHeaders(): Record<string, string> {
 }
 
 async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
-  const res = await apiFetch(`${path}`, {
+  const res = await fetch(`/api${path}`, {
     ...options,
     headers: { ...options.headers, ...authHeaders() } as Record<string, string>,
   })
@@ -28,6 +26,7 @@ export interface ApiDevice {
   plate: string | null
   vin: string | null
   status: 'online' | 'offline' | 'unknown'
+  approved: boolean
   position?: {
     id: string
     latitude: number
@@ -223,6 +222,21 @@ export async function renameDevice(deviceId: string, name: string): Promise<void
 export async function deleteDevice(deviceId: string): Promise<void> {
   const res = await apiFetch(`/devices/${deviceId}`, { method: 'DELETE' })
   if (!res.ok) throw new Error(`Failed to delete: ${res.status}`)
+}
+
+export async function fetchUnregisteredDevices(): Promise<ApiDevice[]> {
+  try {
+    const res = await apiFetch('/devices/unregistered')
+    if (!res.ok) return []
+    return await res.json()
+  } catch {
+    return []
+  }
+}
+
+export async function approveDevice(deviceId: string): Promise<void> {
+  const res = await apiFetch(`/devices/${deviceId}/approve`, { method: 'PATCH' })
+  if (!res.ok) throw new Error(`Failed to approve: ${res.status}`)
 }
 
 export async function fetchTrips(): Promise<FrontendTrip[]> {

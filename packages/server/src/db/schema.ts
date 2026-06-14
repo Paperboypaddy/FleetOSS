@@ -8,6 +8,7 @@ export const devices = pgTable('devices', {
   plate: text('plate'),
   vin: text('vin'),
   status: text('status', { enum: ['online', 'offline', 'unknown'] }).default('unknown').notNull(),
+  approved: boolean('approved').default(false).notNull(),
   attributes: jsonb('attributes').default({}).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),

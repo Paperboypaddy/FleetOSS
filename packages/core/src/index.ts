@@ -6,6 +6,7 @@ export interface Device {
   plate?: string;
   vin?: string;
   status: DeviceStatus;
+  approved: boolean;
   position?: Position;
   attributes: Record<string, unknown>;
   createdAt: string;

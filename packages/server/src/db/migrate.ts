@@ -16,10 +16,16 @@ async function migrate() {
         plate TEXT,
         vin TEXT,
         status TEXT NOT NULL DEFAULT 'unknown' CHECK (status IN ('online', 'offline', 'unknown')),
+        approved BOOLEAN NOT NULL DEFAULT false,
         attributes JSONB NOT NULL DEFAULT '{}',
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
+    `);
+
+    // Add approved column if upgrading from older schema
+    await client.query(`
+      ALTER TABLE devices ADD COLUMN IF NOT EXISTS approved BOOLEAN NOT NULL DEFAULT false
     `);
 
     await client.query(`
