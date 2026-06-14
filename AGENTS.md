@@ -2,6 +2,35 @@
 
 Open Source Fleet & Asset Intelligence Platform — a self-hostable Traccar alternative.
 
+## Agent Coordination
+
+**Instructions:** All agents must update this section when starting or completing work. Keep priority items at the top. Log completed changes below.
+
+### Current Priorities
+<!-- List active priorities here, newest first -->
+- [x] JWT Authentication — login/register page, protected routes, 7-day tokens
+- [x] Settings/Admin panel — sidebar nav, user management (create/list/delete), device config
+- [x] Device-level trip detection toggle (`skipTripDetection` attribute honored by trip detector)
+- [x] Collapsible asset sidebar for mobile
+- [x] Trip playback with green moving marker + trail
+- [x] Real GPS speed readings in playback (not synthetic curve)
+- [x] Editable trip type (None/Work/Personal) and purpose
+- [x] Auto-geocoded addresses saved to DB at trip detection time
+- [x] Server-side reverse geocoding via Nominatim
+- [x] Remove mock data — real API calls throughout
+- [x] Fix trip detector: in-memory state tracking, 5-min stop threshold
+
+### Agent Change Log
+<!-- Agents log their changes here with date/description -->
+- 2026-06-14 — Settings sidebar, user management (create/list/delete), device trip detection toggle, logout button
+- 2026-06-14 — JWT auth with login/register page, protected routes, token management
+- 2026-06-14 — Remove all mock data; Fuel/Maint panels show placeholders
+- 2026-06-14 — Server-side geocoding at trip detection time (addresses saved to DB)
+- 2026-06-14 — Fix trip detector: in-memory state, 5-min stop gap, backfill script
+- 2026-06-14 — Raw GPS trace on map (skip OSRM), real speed readings in playback
+- 2026-06-14 — Background Geolocation format parser, m/s → mph conversion
+- 2026-06-14 — Initialized agent coordination section in AGENTS.md
+
 ## Architecture
 
 Monorepo with npm workspaces:
@@ -23,17 +52,18 @@ fleetoss/
 
 **Structure:**
 - `src/types/index.ts` — Frontend-specific types (Device, Trip, MaintItem, FuelEntry, PlaybackState)
-- `src/data/mockData.ts` — Mock data (used as fallback when API is unreachable)
 - `src/lib/api.ts` — API client: fetch devices/trips/positions, WebSocket, rename/delete, reverse geocode
+- `src/lib/auth.tsx` — AuthProvider, useAuth hook, token management
 - `src/lib/math.ts` — Haversine, bearing, speed color, interpolate, etc.
 - `src/lib/osm.ts` — OSRM route fetching for trip playback (deprecated — using raw GPS positions now)
-- `src/App.tsx` — Shell: sidebar + topbar + panel routing + toast state
+- `src/App.tsx` — Shell: sidebar + topbar + panel routing + auth wrapping + toast state
+- `src/components/auth/` — LoginPage.tsx (login/register form)
 - `src/components/layout/` — Sidebar.tsx, Topbar.tsx
 - `src/components/map/` — MapPanel.tsx (exposes `showTripOnMap` via ref), PlaybackBar.tsx, DeviceList.tsx, MapInfoCard.tsx
 - `src/components/trips/` — TripsPanel.tsx (filterable table + editable type/purpose + geocoded addresses)
-- `src/components/maint/` — MaintPanel.tsx (service items + detail view)
-- `src/components/fuel/` — FuelPanel.tsx (stats, MPG chart, table, log form)
-- `src/components/settings/` — SettingsPanel.tsx (server stats, protocol breakdown, device list)
+- `src/components/maint/` — MaintPanel.tsx (placeholder — coming soon)
+- `src/components/fuel/` — FuelPanel.tsx (placeholder — coming soon)
+- `src/components/settings/` — SettingsPanel.tsx (sidebar nav: General, Users, Devices)
 - `src/components/ui/` — Icons.tsx (SVG components), Toast.tsx
 
 **Key patterns:**
@@ -55,9 +85,10 @@ fleetoss/
 **Structure:**
 - `src/index.ts` — Entry point: Fastify server with CORS, WebSocket, health check, dual-port (4000 + 5055)
 - `src/config/index.ts` — Environment config (PORT, DATABASE_URL, JWT_SECRET, S3, Redis)
+- `src/auth/index.ts` — JWT sign/verify, register/login, authMiddleware for protected routes
 - `src/db/`
   - `connection.ts` — Drizzle + pg Pool singleton
-  - `schema.ts` — Drizzle table definitions (devices, positions, trips, geofences, events)
+  - `schema.ts` — Drizzle table definitions (devices, positions, trips, geofences, events, users)
   - `migrate.ts` — Raw SQL migration (creates PostGIS extension + all tables + indexes)
   - `seed.ts` — Demo data (1 device, 8 positions, 1 trip)
   - `backfill-trips.ts` — One-time script to detect trips from existing position data
@@ -66,14 +97,16 @@ fleetoss/
 - `src/ingestion/`
   - `server.ts` — `POST /api/ingest`, `POST /api/ingest/batch`, `GET/POST /api/ingest/traccar`
   - `protocols/http-json.ts` — Zod-validated parser for HTTP JSON GPS data
-  - `protocols/traccar.ts` — Parser for Traccar/OsmAnd HTTP query-param format
+  - `protocols/traccar.ts` — Parser for Traccar/OsmAnd HTTP query-param + Background Geolocation (nested JSON)
   - Future: `nmea/`, `tk103/`, `obd/` protocol parsers
-- `src/api/routes/devices.ts` — `GET /api/devices`, `GET /api/devices/:id`, `PATCH /api/devices/:id` (rename), `DELETE /api/devices/:id`
+- `src/api/routes/devices.ts` — `GET /api/devices`, `GET /api/devices/:id`, `PATCH /api/devices/:id` (rename + attributes), `DELETE /api/devices/:id`
 - `src/api/routes/positions.ts` — `GET /api/devices/:deviceId/positions?from=&to=&limit=`
 - `src/api/routes/trips.ts` — `GET /api/trips`, `GET /api/trips/:id`, `PATCH /api/trips/:id` (type/purpose), `GET /api/devices/:deviceId/trips`
+- `src/api/routes/users.ts` — `GET /api/users`, `POST /api/users`, `DELETE /api/users/:id` (admin-only)
 - `src/api/routes/stats.ts` — `GET /api/stats` (device/position/trip counts, protocol breakdown)
 - `src/realtime/index.ts` — WebSocket at `/ws`, broadcasts positions to connected clients
-- `src/core/trip-detector.ts` — Speed-based trip start/end detection (in-memory state per device, 5-min stop threshold)
+- `src/core/trip-detector.ts` — Speed-based trip start/end detection (in-memory state per device, 5-min stop threshold, respects skipTripDetection)
+- `src/core/geocode.ts` — Server-side Nominatim reverse geocoding
 
 **Dev server:** `npm run dev -w packages/server` or `npm run dev` from root → http://localhost:4000
 **Traccar-compatible port:** Also listens on :5055 for Traccar Client apps
@@ -108,25 +141,29 @@ Frontend has its own types in `app/src/types/index.ts` (older/separate — consi
 - [x] Frontend: Full SPA with Map (Leaflet + raw GPS traces + playback), Trips, Maintenance, Fuel panels
 - [x] Frontend: Cross-panel trip navigation (click trip → fetch GPS breadcrumbs → show on map)
 - [x] Frontend: WebSocket live position updates on map
-- [x] Frontend: API client replacing mock data (fallback if API unreachable)
+- [x] Frontend: API client with auth headers, fallback to empty arrays on error
 - [x] Frontend: Collapsible asset sidebar for mobile
 - [x] Frontend: Rename/delete devices inline
 - [x] Frontend: Battery level display, last seen timestamps
 - [x] Frontend: Editable trip type (None/Work/Personal) and purpose
 - [x] Frontend: Auto-geocoded trip addresses from Nominatim
-- [x] Frontend: Settings/Admin panel with sidebar, user management, device config
+- [x] Frontend: Settings/Admin panel with sidebar (General, Users, Devices tabs)
+- [x] Frontend: User management (create with role, list, delete)
+- [x] Frontend: Device settings with trip detection toggle
 - [x] Frontend: Logout button in settings sidebar
-- [x] Server: User management API (list, create, delete users)
-- [x] Server: Device-level trip detection toggle (skipTripDetection attribute)
-- [x] Server: Trip detector respects per-device skipTripDetection flag
+- [x] Frontend: JWT login/register page, token persisted to localStorage
+- [x] Frontend: Active panel persisted to localStorage across reloads
 - [x] Core: Shared TypeScript types (Device, Position, Trip, Geofence, Event, etc.)
 - [x] Server: Fastify scaffold with CORS, WebSocket, health check
-- [x] Server: Database schema (devices, positions, trips, geofences, events) with PostGIS indexes
-- [x] Server: Database migration script + seed data
+- [x] Server: JWT auth — register (first-run), login, /api/auth/me
+- [x] Server: User management API (list, create, delete users)
+- [x] Server: Database schema + migrations (devices, positions, trips, geofences, events, users)
 - [x] Server: HTTP/JSON ingestion endpoint (single + batch)
 - [x] Server: Traccar/OsmAnd protocol endpoint (GET/POST with query params)
 - [x] Server: Background Geolocation format support (transistorsoft nested JSON)
-- [x] Server: Device API routes (list, get, rename, delete)
+- [x] Server: Device API routes (list, get, rename, delete, update attributes)
+- [x] Server: Device-level trip detection toggle (skipTripDetection)
+- [x] Server: Trip detector respects per-device skipTripDetection flag
 - [x] Server: Positions API (by device with date range)
 - [x] Server: Trips API (list, get, update type/purpose, by device)
 - [x] Server: Stats API (device/position/trip counts, protocol breakdown)
@@ -144,7 +181,6 @@ Frontend has its own types in `app/src/types/index.ts` (older/separate — consi
 - [ ] Fix TypeScript strict mode issues (implicit any, etc.)
 - [ ] Add error handling middleware
 - [ ] Add request logging / request IDs
-- [ ] Implement auth middleware (JWT initially)
 - [ ] Add pagination to list endpoints
 
 ### 2. More protocol parsers
@@ -167,7 +203,6 @@ Frontend has its own types in `app/src/types/index.ts` (older/separate — consi
 - [ ] Fuel entries API
 
 ### 5. Frontend polish
-- [ ] Auth UI (login page)
 - [ ] Fuel/Maint panels wired to real data
 - [ ] Dark/light theme toggle
 
