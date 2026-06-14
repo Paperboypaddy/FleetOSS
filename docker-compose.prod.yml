@@ -45,8 +45,7 @@ services:
     container_name: fleetoss-prod-server
     restart: unless-stopped
     ports:
-      - '4000:4000'
-      - '5055:5055'
+      - '4001:4000'
     environment:
       NODE_ENV: production
       PORT: '4000'
@@ -70,8 +69,8 @@ services:
       dockerfile: Dockerfile
     container_name: fleetoss-prod-app
     restart: unless-stopped
-    ports:
-      - '80:80'
+    expose:
+      - '80'
     depends_on:
       - server
 
