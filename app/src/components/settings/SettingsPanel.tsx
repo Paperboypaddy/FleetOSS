@@ -28,15 +28,33 @@ export default function SettingsPanel({ showToast }: { showToast: (msg: string) 
   const [stats, setStats] = useState<ServerStats | null>(null)
   const [users, setUsers] = useState<User[]>([])
   const [devices, setDevices] = useState<Device[]>([])
+  const [unregistered, setUnregistered] = useState<Device[]>([])
   const [newUser, setNewUser] = useState({ email: '', name: '', password: '', role: 'viewer' })
   const [creating, setCreating] = useState(false)
   const [siteName, setSiteName] = useState(localStorage.getItem('fleetoss-site-name') || 'FleetOSS')
+  const [logo, setLogo] = useState<string | null>(localStorage.getItem('fleetoss-logo'))
 
   useEffect(() => {
     fetch('/api/stats').then(r => r.json()).then(setStats).catch(() => {})
     authFetch('/api/users').then(r => r.ok ? r.json() : []).then(setUsers).catch(() => {})
     fetch('/api/devices').then(r => r.json()).then(setDevices).catch(() => {})
+    authFetch('/api/devices/unregistered').then(r => r.ok ? r.json() : []).then(setUnregistered).catch(() => {})
   }, [])
+
+  const addDevice = async (device: Device) => {
+    try {
+      const res = await authFetch(`/api/devices/${device.id}/approve`, { method: 'PATCH' })
+      if (res.ok) {
+        const updated = await res.json()
+        setDevices(prev => [...prev, updated])
+        setUnregistered(prev => prev.filter(d => d.id !== device.id))
+        showToast(`Added "${device.name}"`)
+      } else {
+        const err = await res.json()
+        showToast(err.error || 'Failed to add device')
+      }
+    } catch { showToast('Failed to add device') }
+  }
 
   const createUser = async () => {
     if (!newUser.email || !newUser.name || !newUser.password) return
@@ -130,25 +148,66 @@ export default function SettingsPanel({ showToast }: { showToast: (msg: string) 
 
             <div className="bg-surface border border-border rounded-lg p-4 mb-6">
               <h2 className="text-sm font-semibold mb-3">Branding</h2>
-              <div className="flex items-center gap-3">
-                <div className="flex flex-col gap-1 flex-1">
-                  <label className="text-[10px] text-text-muted">Site Name</label>
-                  <input
-                    className="bg-surface-2 border border-border rounded px-2.5 py-1.5 text-xs text-text outline-none focus:border-cyan w-full max-w-xs"
-                    value={siteName}
-                    onChange={e => {
-                      setSiteName(e.target.value)
-                      localStorage.setItem('fleetoss-site-name', e.target.value)
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex flex-col gap-1 flex-1">
+                    <label className="text-[10px] text-text-muted">Site Name</label>
+                    <input
+                      className="bg-surface-2 border border-border rounded px-2.5 py-1.5 text-xs text-text outline-none focus:border-cyan w-full max-w-xs"
+                      value={siteName}
+                      onChange={e => {
+                        setSiteName(e.target.value)
+                        localStorage.setItem('fleetoss-site-name', e.target.value)
+                      }}
+                    />
+                  </div>
+                  <button
+                    className="px-3 py-1.5 rounded-lg bg-transparent text-text-dim border border-border text-xs cursor-pointer hover:bg-surface-2 transition-colors self-end"
+                    onClick={() => {
+                      setSiteName('FleetOSS')
+                      localStorage.removeItem('fleetoss-site-name')
                     }}
-                  />
+                  >Reset</button>
                 </div>
-                <button
-                  className="px-3 py-1.5 rounded-lg bg-transparent text-text-dim border border-border text-xs cursor-pointer hover:bg-surface-2 transition-colors self-end"
-                  onClick={() => {
-                    setSiteName('FleetOSS')
-                    localStorage.removeItem('fleetoss-site-name')
-                  }}
-                >Reset</button>
+                <div className="flex items-center gap-4">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] text-text-muted">Logo</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                        className="hidden"
+                        id="logo-upload"
+                        onChange={e => {
+                          const file = e.target.files?.[0]
+                          if (!file) return
+                          const reader = new FileReader()
+                          reader.onload = () => {
+                            localStorage.setItem('fleetoss-logo', reader.result as string)
+                            setLogo(reader.result as string)
+                          }
+                          reader.readAsDataURL(file)
+                        }}
+                      />
+                      <label
+                        htmlFor="logo-upload"
+                        className="px-3 py-1.5 rounded-lg bg-cyan text-bg text-xs font-semibold cursor-pointer hover:opacity-85 transition-opacity"
+                      >Choose File</label>
+                      {logo && (
+                        <button
+                          className="px-3 py-1.5 rounded-lg bg-transparent text-red border border-border text-xs cursor-pointer hover:bg-[rgba(239,68,68,0.1)] transition-colors"
+                          onClick={() => { setLogo(null); localStorage.removeItem('fleetoss-logo') }}
+                        >Remove</button>
+                      )}
+                    </div>
+                  </div>
+                  {logo && (
+                    <div className="flex items-center gap-2 bg-surface-2 border border-border rounded-lg px-3 py-2">
+                      <img src={logo} alt="Logo preview" className="h-8 w-auto max-w-[120px] object-contain" />
+                      <span className="text-[10px] text-text-muted">Preview</span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -264,7 +323,45 @@ export default function SettingsPanel({ showToast }: { showToast: (msg: string) 
         {tab === 'devices' && (
           <div className="p-6">
             <h1 className="text-lg font-semibold mb-1">Devices</h1>
-            <p className="text-xs text-text-muted mb-4">Configure device-level settings</p>
+            <p className="text-xs text-text-muted mb-4">Add or configure devices</p>
+
+            {/* Unregistered devices */}
+            {unregistered.length > 0 && (
+              <div className="bg-surface border border-border rounded-lg overflow-hidden mb-6">
+                <div className="px-4 py-2.5 border-b border-border text-xs font-semibold text-amber uppercase tracking-wider">
+                  Devices Awaiting Approval ({unregistered.length})
+                </div>
+                <table className="w-full border-collapse">
+                  <thead><tr>
+                    {['Name', 'ID', 'Status', ''].map(h => (
+                      <th key={h} className="px-4 py-2 text-left text-[10px] font-semibold text-text-muted uppercase tracking-wider border-b border-border">{h}</th>
+                    ))}
+                  </tr></thead>
+                  <tbody>
+                    {unregistered.map(d => (
+                      <tr key={d.id} className="border-b border-[rgba(46,54,80,0.5)] text-xs">
+                        <td className="px-4 py-2.5 font-medium">{d.name}</td>
+                        <td className="px-4 py-2.5 text-text-muted font-mono">{d.uniqueId}</td>
+                        <td className="px-4 py-2.5">
+                          <span className="text-text-muted flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-text-muted" />
+                            unknown
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <button
+                            className="px-3 py-1 rounded-md bg-cyan text-bg text-[11px] font-semibold border-none cursor-pointer hover:opacity-85"
+                            onClick={() => addDevice(d)}
+                          >Add</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Registered devices */}
             <div className="bg-surface border border-border rounded-lg overflow-hidden">
               <table className="w-full border-collapse">
                 <thead><tr>

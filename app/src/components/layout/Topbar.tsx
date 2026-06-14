@@ -16,7 +16,11 @@ interface TopbarProps {
 export default function Topbar({ activePanel, deviceCount }: TopbarProps) {
   return (
     <div className="h-13 bg-surface border-b border-border flex items-center px-4 gap-3 shrink-0">
-      <span className="font-mono text-xs font-bold text-cyan tracking-wider">{localStorage.getItem('fleetoss-site-name') || 'FleetOSS'}</span>
+      {(() => {
+        const logo = localStorage.getItem('fleetoss-logo')
+        if (logo) return <img src={logo} alt="" className="h-7 w-auto max-w-[140px] object-contain" />
+        return <span className="font-mono text-xs font-bold text-cyan tracking-wider">{localStorage.getItem('fleetoss-site-name') || 'FleetOSS'}</span>
+      })()}
       <div className="w-px h-5 bg-border" />
       <div className="flex gap-0.5">
         <button className="px-3 py-[5px] rounded-md border-none bg-cyan-dim text-cyan text-xs font-medium cursor-pointer">

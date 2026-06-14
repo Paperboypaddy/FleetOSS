@@ -8,9 +8,11 @@ Open Source Fleet & Asset Intelligence Platform — a self-hostable Traccar alte
 
 ### Current Priorities
 <!-- List active priorities here, newest first -->
+- [x] Device approval flow: new GPS devices created as unapproved, admin adds them via Settings → Devices
 - [x] JWT Authentication — login/register page, protected routes, 7-day tokens
 - [x] Settings/Admin panel — sidebar nav, user management (create/list/delete), device config
 - [x] Device-level trip detection toggle (`skipTripDetection` attribute honored by trip detector)
+- [x] Custom site name and logo upload in General settings
 - [x] Collapsible asset sidebar for mobile
 - [x] Trip playback with green moving marker + trail
 - [x] Real GPS speed readings in playback (not synthetic curve)
@@ -22,6 +24,7 @@ Open Source Fleet & Asset Intelligence Platform — a self-hostable Traccar alte
 
 ### Agent Change Log
 <!-- Agents log their changes here with date/description -->
+- 2026-06-14 — Device approval flow: `approved` column/flag, unapproved devices hidden from map, Settings → Devices shows "Devices Awaiting Approval" with Add button
 - 2026-06-14 — Settings sidebar, user management (create/list/delete), device trip detection toggle, logout button
 - 2026-06-14 — JWT auth with login/register page, protected routes, token management
 - 2026-06-14 — Remove all mock data; Fuel/Maint panels show placeholders
