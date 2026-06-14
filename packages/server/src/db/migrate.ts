@@ -46,6 +46,7 @@ async function migrate() {
         battery_level DOUBLE PRECISION,
         rpm DOUBLE PRECISION,
         fuel_consumption DOUBLE PRECISION,
+        speed_limit DOUBLE PRECISION,
         valid BOOLEAN NOT NULL DEFAULT true,
         protocol TEXT NOT NULL,
         attributes JSONB NOT NULL DEFAULT '{}',

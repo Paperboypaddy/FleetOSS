@@ -95,6 +95,20 @@ export async function getSpeedLimit(lat: number, lng: number): Promise<SpeedLimi
   return result
 }
 
+// Resolve speed limit for a single position and update DB (fire-and-forget)
+export async function resolveSpeedLimitForPosition(positionId: string, lat: number, lng: number): Promise<void> {
+  try {
+    const result = await getSpeedLimit(lat, lng);
+    if (result.speed != null) {
+      const { getDb } = await import('../db/connection.js');
+      const { positions } = await import('../db/schema.js');
+      const { eq } = await import('drizzle-orm');
+      const db = getDb();
+      await db.update(positions).set({ speedLimit: result.speed }).where(eq(positions.id, positionId));
+    }
+  } catch {}
+}
+
 export async function getSpeedLimits(coords: Array<[number, number]>): Promise<(number | null)[]> {
   const results: (number | null)[] = []
   const queries: Array<{ lat: number; lng: number; idx: number }> = []

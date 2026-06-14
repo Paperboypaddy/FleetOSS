@@ -6,6 +6,7 @@ import { insertPosition } from '../db/repositories/position.js';
 import { findOrCreateDevice, updateDeviceStatus } from '../db/repositories/device.js';
 import { broadcastPosition } from '../realtime/index.js';
 import { detectTrip } from '../core/trip-detector.js';
+import { resolveSpeedLimitForPosition } from '../core/speed-limits.js';
 
 async function ingestPosition(data: import('@fleetoss/core').IngestedPosition, protocol: string) {
   const device = await findOrCreateDevice(data.deviceId);
@@ -13,6 +14,8 @@ async function ingestPosition(data: import('@fleetoss/core').IngestedPosition, p
   await updateDeviceStatus(device.id, 'online');
   broadcastPosition(position);
   detectTrip(device.id, position);
+  // Resolve speed limit in background (non-blocking, cached server-side)
+  resolveSpeedLimitForPosition(position.id, position.latitude, position.longitude);
   return { id: position.id };
 }
 

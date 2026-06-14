@@ -75,6 +75,7 @@ export interface ApiPosition {
   accuracy: number | null
   batteryLevel: number | null
   odometer: number | null
+  speedLimit: number | null
   deviceTimestamp: string
   serverTimestamp: string
   protocol: string
@@ -302,7 +303,7 @@ export async function fetchTripPositions(deviceId: string, from: string, to: str
     return positions.reverse().map(p => ({
       latlng: [p.latitude, p.longitude] as [number, number],
       speed: (p.speed != null && p.speed >= 0) ? Math.round(p.speed) : 0,
-      speedLimit: undefined as number | undefined | null,
+      speedLimit: p.speedLimit != null ? p.speedLimit : undefined,
     }))
   } catch {
     return []

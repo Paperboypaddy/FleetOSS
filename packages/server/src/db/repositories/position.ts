@@ -20,11 +20,17 @@ export async function insertPosition(data: IngestedPosition, protocol: string): 
     batteryLevel: data.batteryLevel,
     rpm: data.rpm,
     fuelConsumption: data.fuelConsumption,
+    speedLimit: data.speedLimit,
     protocol,
     deviceTimestamp: new Date(data.timestamp),
     attributes: data.attributes || {},
   }).returning();
   return created[0] as unknown as Position;
+}
+
+export async function updatePositionSpeedLimit(positionId: string, speedLimit: number): Promise<void> {
+  const db = getDb();
+  await db.update(positions).set({ speedLimit }).where(eq(positions.id, positionId));
 }
 
 export async function getLatestPosition(deviceId: string): Promise<Position | null> {

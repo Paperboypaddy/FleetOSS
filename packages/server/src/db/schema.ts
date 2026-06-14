@@ -31,6 +31,7 @@ export const positions = pgTable('positions', {
   batteryLevel: doublePrecision('battery_level'),
   rpm: doublePrecision('rpm'),
   fuelConsumption: doublePrecision('fuel_consumption'),
+  speedLimit: doublePrecision('speed_limit'),
   valid: boolean('valid').default(true).notNull(),
   protocol: text('protocol').notNull(),
   attributes: jsonb('attributes').default({}).notNull(),

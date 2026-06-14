@@ -33,6 +33,7 @@ export interface Position {
   batteryLevel?: number;
   rpm?: number;
   fuelConsumption?: number;
+  speedLimit?: number;
   valid: boolean;
   protocol: string;
   attributes: Record<string, unknown>;
@@ -137,6 +138,7 @@ export interface IngestedPosition {
   batteryLevel?: number;
   rpm?: number;
   fuelConsumption?: number;
+  speedLimit?: number;
   timestamp: string;
   attributes?: Record<string, unknown>;
 }
