@@ -172,6 +172,48 @@ async function migrate() {
       )
     `);
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS api_keys (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        name TEXT NOT NULL,
+        key_hash TEXT NOT NULL UNIQUE,
+        key_prefix TEXT NOT NULL,
+        user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+        permissions JSONB NOT NULL DEFAULT '["read"]',
+        enabled BOOLEAN NOT NULL DEFAULT true,
+        last_used_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id) ON DELETE SET NULL`);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS groups (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        name TEXT NOT NULL,
+        description TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS group_devices (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+        device_id UUID NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+        permission TEXT NOT NULL DEFAULT 'view' CHECK (permission IN ('view', 'manage', 'admin'))
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS user_groups (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE
+      )
+    `);
+
     console.log('Migration complete');
   } finally {
     client.release();

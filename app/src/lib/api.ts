@@ -14,7 +14,7 @@ async function apiFetch(path: string, options: RequestInit = {}): Promise<Respon
   if (res.status === 401) {
     localStorage.removeItem('fleetoss-token')
     localStorage.removeItem('fleetoss-user')
-    window.location.reload()
+    window.dispatchEvent(new CustomEvent('auth:logout'))
   }
   return res
 }
@@ -187,18 +187,24 @@ function mapTrip(api: ApiTrip, deviceName: string): FrontendTrip {
   }
 }
 
+function extractData(res: any): any[] {
+  if (res && typeof res === 'object' && 'data' in res && Array.isArray(res.data)) return res.data
+  if (Array.isArray(res)) return res
+  return []
+}
+
 export async function fetchDevices(): Promise<FrontendDevice[]> {
   try {
-    const res = await apiFetch(`/devices`)
+    const res = await apiFetch(`/devices?limit=100`)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const data: ApiDevice[] = await res.json()
+    const data: ApiDevice[] = extractData(await res.json())
     const result: FrontendDevice[] = []
     for (const d of data) {
       let latestPos: ApiPosition | undefined
       try {
         const posRes = await apiFetch(`/devices/${d.id}/positions?limit=1`)
         if (posRes.ok) {
-          const positions: ApiPosition[] = await posRes.json()
+          const positions: ApiPosition[] = extractData(await posRes.json())
           latestPos = positions[0]
         }
       } catch {}
@@ -229,7 +235,8 @@ export async function fetchUnregisteredDevices(): Promise<ApiDevice[]> {
   try {
     const res = await apiFetch('/devices/unregistered')
     if (!res.ok) return []
-    return await res.json()
+    const json = await res.json()
+    return extractData(json)
   } catch {
     return []
   }
@@ -242,11 +249,11 @@ export async function approveDevice(deviceId: string): Promise<void> {
 
 export async function fetchTrips(): Promise<FrontendTrip[]> {
   try {
-    const res = await apiFetch(`/trips`)
+    const res = await apiFetch(`/trips?limit=100`)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const data: ApiTrip[] = await res.json()
-    const deviceRes = await apiFetch(`/devices`)
-    const devices: ApiDevice[] = deviceRes.ok ? await deviceRes.json() : []
+    const data: ApiTrip[] = extractData(await res.json())
+    const deviceRes = await apiFetch(`/devices?limit=100`)
+    const devices: ApiDevice[] = deviceRes.ok ? extractData(await deviceRes.json()) : []
     const nameMap = new Map(devices.map(d => [d.id, d.name]))
     return data.map(t => mapTrip(t, nameMap.get(t.deviceId) || t.deviceId))
   } catch (err) {
@@ -297,9 +304,9 @@ export async function fetchTripPositions(deviceId: string, from: string, to: str
   try {
     const fromParam = encodeURIComponent(from)
     const toParam = encodeURIComponent(to)
-    const res = await apiFetch(`/devices/${deviceId}/positions?from=${fromParam}&to=${toParam}&limit=1000`)
+    const res = await apiFetch(`/devices/${deviceId}/positions?from=${fromParam}&to=${toParam}&limit=5000`)
     if (!res.ok) return []
-    const positions: ApiPosition[] = await res.json()
+    const positions: ApiPosition[] = await res.json() as ApiPosition[]
     return positions.reverse().map(p => ({
       latlng: [p.latitude, p.longitude] as [number, number],
       speed: (p.speed != null && p.speed >= 0) ? Math.round(p.speed) : 0,

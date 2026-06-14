@@ -5,9 +5,10 @@ import { speedColor, addMins, secToMMSS, bearing, interpAtSec } from '../../lib/
 interface PlaybackBarProps {
   pb: PlaybackState | null;
   onSeek: (sec: number) => void;
+  onSetFollow: (v: boolean) => void;
 }
 
-export default function PlaybackBar({ pb, onSeek }: PlaybackBarProps) {
+export default function PlaybackBar({ pb, onSeek, onSetFollow }: PlaybackBarProps) {
   const [playing, setPlaying] = useState(false);
   const rafRef = useRef<number | null>(null);
   const lastTsRef = useRef<number | null>(null);
@@ -133,6 +134,50 @@ export default function PlaybackBar({ pb, onSeek }: PlaybackBarProps) {
     if (pbRef.current) pbRef.current.active = false;
   }, [pbPause]);
 
+  // Keyboard controls
+  const pbSkipRef = useRef(pbSkip);
+  pbSkipRef.current = pbSkip;
+  const pbSetSpeedRef = useRef(pbSetSpeed);
+  pbSetSpeedRef.current = pbSetSpeed;
+  const pbTogglePlayRef = useRef(pbTogglePlay);
+  pbTogglePlayRef.current = pbTogglePlay;
+  const closePlaybackRef = useRef(closePlayback);
+  closePlaybackRef.current = closePlayback;
+  const pbStopRef = useRef(pbStop);
+  pbStopRef.current = pbStop;
+
+  useEffect(() => {
+    if (!pb?.active) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
+      switch (e.key) {
+        case ' ':
+          e.preventDefault();
+          pbTogglePlayRef.current();
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          pbSkipRef.current(e.shiftKey ? -5 : -15);
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          pbSkipRef.current(e.shiftKey ? 5 : 15);
+          break;
+        case 'Escape':
+          closePlaybackRef.current();
+          break;
+        case '1': pbSetSpeedRef.current('1'); break;
+        case '2': pbSetSpeedRef.current('2'); break;
+        case '3': pbSetSpeedRef.current('5'); break;
+        case '4': pbSetSpeedRef.current('10'); break;
+        case '5': pbSetSpeedRef.current('20'); break;
+        case '6': pbSetSpeedRef.current('60'); break;
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [pb?.active]);
+
   const scrubStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     if (!pb?.active) return;
     const track = document.getElementById('pb-track');
@@ -172,6 +217,12 @@ export default function PlaybackBar({ pb, onSeek }: PlaybackBarProps) {
         <span className="font-mono text-xs text-cyan truncate flex-1">
           {pb.tripData?.date} · {pb.tripData?.from} → {pb.tripData?.to} · {pb.tripData?.dist} mi
         </span>
+        <div className="flex items-center gap-1 text-[9px] text-text-muted font-mono mr-auto ml-2">
+          <kbd className="px-1 py-[1px] rounded bg-surface-2 border border-border text-[9px]">Space</kbd> play
+          <kbd className="px-1 py-[1px] rounded bg-surface-2 border border-border text-[9px] ml-1.5">←</kbd><kbd className="px-1 py-[1px] rounded bg-surface-2 border border-border text-[9px]">→</kbd> skip
+          <kbd className="px-1 py-[1px] rounded bg-surface-2 border border-border text-[9px] ml-1.5">1</kbd>–<kbd className="px-1 py-[1px] rounded bg-surface-2 border border-border text-[9px]">6</kbd> speed
+          <kbd className="px-1 py-[1px] rounded bg-surface-2 border border-border text-[9px] ml-1.5">Esc</kbd> close
+        </div>
         <button className="w-[22px] h-[22px] rounded border border-border bg-transparent text-text-muted cursor-pointer text-sm flex items-center justify-center hover:bg-surface-2 hover:text-text transition-colors" onClick={closePlayback}>✕</button>
       </div>
 
@@ -214,6 +265,16 @@ export default function PlaybackBar({ pb, onSeek }: PlaybackBarProps) {
         </button>
         <button className="w-8 h-8 rounded-md bg-surface-2 border border-border text-text cursor-pointer flex items-center justify-center hover:bg-border transition-colors shrink-0" onClick={pbStop}>
           <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5"><rect x="4" y="4" width="16" height="16" rx="1"/></svg>
+        </button>
+        <button
+          onClick={() => onSetFollow(!pb.follow)}
+          className={`w-8 h-8 rounded-md border cursor-pointer flex items-center justify-center shrink-0 transition-colors ${pb.follow ? 'bg-cyan-dim border-[rgba(0,212,255,0.3)] text-cyan' : 'bg-surface-2 border-border text-text-muted hover:text-text hover:bg-border'}`}
+          title={pb.follow ? 'Unlock from vehicle' : 'Follow vehicle'}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>
+          </svg>
         </button>
         <select className="bg-surface-2 border border-border text-text font-mono text-xs px-1.5 py-1 rounded-md cursor-pointer outline-none" value={pb.speed} onChange={e => pbSetSpeed(e.target.value)}>
           <option value="1">1×</option>

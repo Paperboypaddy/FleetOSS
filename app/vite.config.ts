@@ -8,7 +8,10 @@ export default defineConfig({
     host: '0.0.0.0',
     allowedHosts: ['fleetoss.phnet.xyz', '.phnet.xyz'],
     proxy: {
-      '/api': 'http://localhost:4000',
+      '/api': {
+        target: 'http://localhost:4000',
+        changeOrigin: false,
+      },
       '/ws': {
         target: 'ws://localhost:4000',
         ws: true,

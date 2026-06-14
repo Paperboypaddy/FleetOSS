@@ -72,6 +72,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(false)
   }, [])
 
+  // Listen for forced logout from 401 responses
+  useEffect(() => {
+    const handleLogout = () => {
+      setToken(null)
+      setUser(null)
+    }
+    window.addEventListener('auth:logout', handleLogout)
+    return () => window.removeEventListener('auth:logout', handleLogout)
+  }, [])
+
   // Fetch available auth providers
   useEffect(() => {
     fetch('/api/auth/providers')
@@ -115,12 +125,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user)
   }, [])
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    // If SSO user, get the IdP logout URL and redirect
+    if (user?.authProvider && user.authProvider !== 'local' && user.authProvider !== 'ldap') {
+      try {
+        const res = await fetch('/api/auth/logout', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (res.ok) {
+          const { logoutUrl } = await res.json()
+          if (logoutUrl) {
+            localStorage.removeItem('fleetoss-token')
+            localStorage.removeItem('fleetoss-user')
+            window.location.href = logoutUrl
+            return
+          }
+        }
+      } catch {}
+    }
     localStorage.removeItem('fleetoss-token')
     localStorage.removeItem('fleetoss-user')
     setToken(null)
     setUser(null)
-  }, [])
+  }, [user, token])
 
   const ssoLogin = useCallback((provider: AuthProviderInfo) => {
     if (provider.loginUrl) {

@@ -27,14 +27,24 @@ let oidcConfig: client.Configuration | null = null;
 
 async function getOidcConfig() {
   if (oidcConfig) return oidcConfig;
-  const { allowInsecureRequests } = await import('openid-client');
-  allowInsecureRequests = true;
   const oa = config.auth.oidc;
-  oidcConfig = await client.discovery(
-    new URL(oa.issuer),
-    oa.clientId,
-    oa.clientSecret,
-  );
+  const wellKnown = `${oa.issuer}/.well-known/openid-configuration`;
+  const resp = await fetch(wellKnown);
+  if (!resp.ok) throw new Error(`Failed to fetch OIDC config from ${wellKnown}`);
+  const metadata = await resp.json();
+  const as = {
+    issuer: metadata.issuer,
+    authorization_endpoint: metadata.authorization_endpoint,
+    token_endpoint: metadata.token_endpoint,
+    userinfo_endpoint: metadata.userinfo_endpoint,
+    jwks_uri: metadata.jwks_uri,
+    scopes_supported: metadata.scopes_supported,
+    response_types_supported: metadata.response_types_supported,
+    subject_types_supported: metadata.subject_types_supported,
+    id_token_signing_alg_values_supported: metadata.id_token_signing_alg_values_supported,
+  };
+  oidcConfig = new client.Configuration(as, oa.clientId, { client_secret: oa.clientSecret });
+  client.allowInsecureRequests(oidcConfig);
   return oidcConfig;
 }
 

@@ -1,4 +1,18 @@
 import { useEffect, useState } from 'react'
+import { getAuthToken } from '../../lib/auth'
+
+function authFetch(path: string) {
+  const token = getAuthToken()
+  return fetch(path, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+}
+
+function extractData(res: any): any[] {
+  if (res && typeof res === 'object' && 'data' in res && Array.isArray(res.data)) return res.data
+  if (Array.isArray(res)) return res
+  return []
+}
 
 interface FuelEntry {
   id: string; deviceId: string; date: string
@@ -15,16 +29,17 @@ export default function FuelPanel({ showToast }: FuelPanelProps) {
   const [form, setForm] = useState({ deviceId: '', date: new Date().toISOString().split('T')[0], gallons: '', pricePerGallon: '', station: '', odometer: '' })
 
   useEffect(() => {
-    fetch('/api/fuel').then(r => r.json()).then(setEntries).catch(() => {})
-    fetch('/api/devices').then(r => r.json()).then(setDevices).catch(() => {})
+    authFetch('/api/fuel').then(r => r.json()).then(data => setEntries(extractData(data))).catch(() => {})
+    authFetch('/api/devices').then(r => r.json()).then(data => setDevices(extractData(data))).catch(() => {})
   }, [])
 
   const addEntry = async () => {
     if (!form.deviceId || !form.gallons) return
+    const token = getAuthToken()
     try {
       const res = await fetch('/api/fuel', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({
           deviceId: form.deviceId,
           date: new Date(form.date).toISOString(),
@@ -46,7 +61,8 @@ export default function FuelPanel({ showToast }: FuelPanelProps) {
 
   const deleteEntry = async (id: string) => {
     if (!confirm('Delete this entry?')) return
-    await fetch(`/api/fuel/${id}`, { method: 'DELETE' })
+    const token = getAuthToken()
+    await fetch(`/api/fuel/${id}`, { method: 'DELETE', headers: token ? { Authorization: `Bearer ${token}` } : {} })
     setEntries(prev => prev.filter(e => e.id !== id))
     showToast('Deleted')
   }

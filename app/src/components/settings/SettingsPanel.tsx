@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
-import { getAuthToken } from '../../lib/auth'
+import { getAuthToken, useAuth } from '../../lib/auth'
 import SsoSettings from './SsoSettings'
+import ApiKeysSettings from './ApiKeysSettings'
+import GroupsSettings from './GroupsSettings'
 
 interface ServerStats {
   devices: number; positions: number; trips: number; onlineDevices: number
@@ -15,7 +17,7 @@ interface Device {
   plate?: string | null
 }
 
-type SettingsTab = 'general' | 'users' | 'devices' | 'personal' | 'sso'
+type SettingsTab = 'general' | 'users' | 'devices' | 'personal' | 'sso' | 'api-keys' | 'groups'
 
 function authFetch(path: string, options: RequestInit = {}) {
   const headers: Record<string, string> = { ...(options.headers as Record<string, string> || {}) }
@@ -33,6 +35,7 @@ const THEMES = [
 ]
 
 export default function SettingsPanel({ showToast, colorTheme, onColorThemeChange }: { showToast: (msg: string) => void; colorTheme: string; onColorThemeChange: (t: string) => void }) {
+  const { user } = useAuth()
   const [tab, setTab] = useState<SettingsTab>('general')
   const [stats, setStats] = useState<ServerStats | null>(null)
   const [users, setUsers] = useState<User[]>([])
@@ -46,10 +49,16 @@ export default function SettingsPanel({ showToast, colorTheme, onColorThemeChang
   const [registering, setRegistering] = useState(false)
 
   useEffect(() => {
-    fetch('/api/stats').then(r => r.json()).then(setStats).catch(() => {})
-    authFetch('/api/users').then(r => r.ok ? r.json() : []).then(setUsers).catch(() => {})
-    fetch('/api/devices').then(r => r.json()).then(setDevices).catch(() => {})
-    authFetch('/api/devices/unregistered').then(r => r.ok ? r.json() : []).then(setUnregistered).catch(() => {})
+    authFetch('/api/stats').then(r => r.json()).then(setStats).catch(() => {})
+    authFetch('/api/users').then(r => r.ok ? r.json() : []).then(data => {
+      setUsers(data.data || data)
+    }).catch(() => {})
+    authFetch('/api/devices').then(r => r.json()).then(data => {
+      setDevices(data.data || data)
+    }).catch(() => {})
+    authFetch('/api/devices/unregistered').then(r => r.ok ? r.json() : []).then(data => {
+      setUnregistered(data.data || data)
+    }).catch(() => {})
   }, [])
 
   const addDevice = async (device: Device) => {
@@ -138,13 +147,19 @@ export default function SettingsPanel({ showToast, colorTheme, onColorThemeChang
     } catch { showToast('Failed to update device') }
   }
 
-  const tabs: { id: SettingsTab; label: string }[] = [
+  const allTabs: { id: SettingsTab; label: string }[] = [
     { id: 'general', label: 'General' },
     { id: 'personal', label: 'Personal' },
+    { id: 'api-keys', label: 'API Keys' },
     { id: 'users', label: 'Users' },
     { id: 'devices', label: 'Devices' },
     { id: 'sso', label: 'SSO' },
+    { id: 'groups', label: 'Groups' },
   ]
+  const isAdmin = user?.role === 'admin'
+  const tabs = allTabs.filter(t =>
+    isAdmin || (t.id !== 'users' && t.id !== 'devices' && t.id !== 'sso' && t.id !== 'groups')
+  )
 
   const fmtUptime = (s: number) => `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`
 
@@ -284,6 +299,40 @@ export default function SettingsPanel({ showToast, colorTheme, onColorThemeChang
           <div className="p-6">
             <h1 className="text-lg font-semibold mb-1">Personal</h1>
             <p className="text-xs text-text-muted mb-6">Account preferences and appearance</p>
+
+            {/* Account info */}
+            <div className="bg-surface border border-border rounded-lg p-4 mb-6">
+              <h2 className="text-sm font-semibold mb-3">Account</h2>
+              <div className="space-y-2 text-xs">
+                <div className="flex items-center gap-3">
+                  <span className="text-text-muted w-16 shrink-0">Name</span>
+                  <span className="text-text font-medium">{user?.name || '—'}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-text-muted w-16 shrink-0">Email</span>
+                  <span className="text-text font-mono">{user?.email || '—'}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-text-muted w-16 shrink-0">Role</span>
+                  <span className={`px-2 py-0.5 rounded font-mono text-[10px] font-semibold ${
+                    user?.role === 'admin' ? 'bg-cyan-dim text-cyan' :
+                    user?.role === 'manager' ? 'bg-amber-dim text-amber' :
+                    'bg-surface-2 text-text-muted'
+                  }`}>{user?.role || '—'}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-text-muted w-16 shrink-0">Source</span>
+                  <span className="text-text font-mono">
+                    {user?.authProvider === 'local' ? 'Email & Password' :
+                     user?.authProvider === 'ldap' ? 'LDAP / Active Directory' :
+                     user?.authProvider === 'oidc' ? 'OpenID Connect (SSO)' :
+                     user?.authProvider === 'oauth2' ? 'OAuth2 (SSO)' :
+                     user?.authProvider === 'saml' ? 'SAML (SSO)' :
+                     user?.authProvider || '—'}
+                  </span>
+                </div>
+              </div>
+            </div>
 
             <div className="bg-surface border border-border rounded-lg p-4">
               <h2 className="text-sm font-semibold mb-3">Color Theme</h2>
@@ -521,6 +570,8 @@ export default function SettingsPanel({ showToast, colorTheme, onColorThemeChang
           </div>
         )}
         {tab === 'sso' && <SsoSettings showToast={showToast} />}
+        {tab === 'api-keys' && <ApiKeysSettings showToast={showToast} />}
+        {tab === 'groups' && <GroupsSettings showToast={showToast} />}
       </div>
     </div>
   )

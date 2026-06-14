@@ -31,12 +31,15 @@ export class AppError extends Error {
 
 export function registerErrorHandler(app: FastifyInstance) {
   app.setErrorHandler((error: FastifyError | Error, request, reply) => {
+    const reqId = request.id as string;
+
     // Fastify validation errors (schema-based)
     if ('validation' in error && error.validation) {
       const validationErr = error as FastifyError;
       return reply.code(400).send({
         error: 'Validation failed',
         statusCode: 400,
+        requestId: reqId,
         details: validationErr.validation,
       });
     }
@@ -46,6 +49,7 @@ export function registerErrorHandler(app: FastifyInstance) {
       const payload: Record<string, unknown> = {
         error: error.message,
         statusCode: error.statusCode,
+        requestId: reqId,
       };
       if (error.details !== undefined) payload.details = error.details;
       return reply.code(error.statusCode).send(payload);
@@ -56,6 +60,7 @@ export function registerErrorHandler(app: FastifyInstance) {
       return reply.code(400).send({
         error: 'Validation failed',
         statusCode: 400,
+        requestId: reqId,
         details: error.errors,
       });
     }
@@ -65,14 +70,16 @@ export function registerErrorHandler(app: FastifyInstance) {
       return reply.code(409).send({
         error: 'Resource already exists',
         statusCode: 409,
+        requestId: reqId,
       });
     }
 
     // Unknown errors — log and return generic 500
-    request.log.error({ err: error, message: error.message }, 'Unhandled error');
+    request.log.error({ err: error, message: error.message, reqId }, 'Unhandled error');
     return reply.code(500).send({
       error: 'Internal server error',
       statusCode: 500,
+      requestId: reqId,
     });
   });
 

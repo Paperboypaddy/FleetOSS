@@ -1,18 +1,21 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import websocket from '@fastify/websocket';
+import crypto from 'node:crypto';
 import { config } from './config/index.js';
 import { registerIngestionRoutes, handleTraccarIngest } from './ingestion/server.js';
 import { registerDeviceRoutes } from './api/routes/devices.js';
 import { registerPositionRoutes } from './api/routes/positions.js';
 import { registerTripRoutes } from './api/routes/trips.js';
-import { registerAuthRoutes, registerDbAuthRoutes } from './auth/index.js';
+import { registerAuthRoutes, registerDbAuthRoutes, authMiddleware } from './auth/index.js';
 import { registerUserRoutes } from './api/routes/users.js';
 import { registerGeofenceRoutes } from './api/routes/geofences.js';
 import { registerEventRoutes } from './api/routes/events.js';
 import { registerMaintenanceRoutes } from './api/routes/maintenance.js';
 import { registerFuelRoutes } from './api/routes/fuel.js';
 import { registerAuthProviderRoutes } from './api/routes/auth-providers.js';
+import { registerApiKeyRoutes } from './api/routes/api-keys.js';
+import { registerGroupRoutes } from './api/routes/groups.js';
 import { registerSpeedLimitRoutes } from './api/routes/speedlimits.js';
 import { registerStatsRoutes } from './api/routes/stats.js';
 import { registerErrorHandler } from './api/errors.js';
@@ -36,6 +39,7 @@ async function main() {
         options: { translateTime: 'HH:MM:ss', ignore: 'pid,hostname' },
       },
     },
+    genReqId: () => crypto.randomUUID().slice(0, 8),
   });
 
   await app.register(cors, { origin: true });
@@ -48,10 +52,26 @@ async function main() {
   app.get('/', handleTraccarIngest);
   app.post('/', handleTraccarIngest);
 
+  // Request logging — adds request ID to every response header
+  app.addHook('preHandler', (request, reply, done) => {
+    reply.header('X-Request-Id', request.id as string);
+    done();
+  });
+
   // Routes
   await registerAuthRoutes(app);
   await registerDbAuthRoutes(app);
   registerIngestionRoutes(app);
+
+  // Global auth middleware for all API routes (except public ones registered above)
+  app.addHook('preHandler', (request, reply, done) => {
+    const url = request.url;
+    if (url.startsWith('/api/') && !url.startsWith('/api/health') && !url.startsWith('/api/auth/') && !url.startsWith('/api/ingest')) {
+      return authMiddleware(request, reply);
+    }
+    done();
+  });
+
   registerDeviceRoutes(app);
   registerPositionRoutes(app);
   registerTripRoutes(app);
@@ -61,6 +81,8 @@ async function main() {
   registerMaintenanceRoutes(app);
   registerFuelRoutes(app);
   registerAuthProviderRoutes(app);
+  registerApiKeyRoutes(app);
+  registerGroupRoutes(app);
   registerSpeedLimitRoutes(app);
   registerStatsRoutes(app);
   registerRealtime(app);

@@ -55,6 +55,7 @@ export interface FuelEntry {
 export interface PlaybackState {
   active: boolean;
   playing: boolean;
+  follow: boolean;
   route: any | null;
   coords: [number, number][];
   speeds: number[];

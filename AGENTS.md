@@ -2,6 +2,42 @@
 
 Open Source Fleet & Asset Intelligence Platform — a self-hostable Traccar alternative.
 
+## Agent API Key
+
+**API Key for OpenCode agents:** `foss_AZ2btKamIRO_2-q_PjBptXRRw6NOU4zc`
+
+Use this key to authenticate API calls to FleetOSS:
+
+```bash
+# List devices (paginated)
+curl -H "Authorization: Bearer foss_AZ2btKamIRO_2-q_PjBptXRRw6NOU4zc" \
+  "http://fleetoss.phnet.xyz:5173/api/devices?page=1&limit=10"
+
+# List trips
+curl -H "Authorization: Bearer foss_AZ2btKamIRO_2-q_PjBptXRRw6NOU4zc" \
+  "http://fleetoss.phnet.xyz:5173/api/trips?page=1&limit=10"
+
+# Get device positions
+curl -H "Authorization: Bearer foss_AZ2btKamIRO_2-q_PjBptXRRw6NOU4zc" \
+  "http://fleetoss.phnet.xyz:5173/api/devices/{deviceId}/positions?limit=10"
+```
+
+All API endpoints return paginated responses:
+```json
+{
+  "data": [...],
+  "total": 42,
+  "page": 1,
+  "limit": 20,
+  "hasMore": true
+}
+```
+
+Error responses include `requestId` for debugging:
+```json
+{ "error": "...", "requestId": "abc12345" }
+```
+
 ## Agent Coordination
 
 **Instructions:** All agents must update this section when starting or completing work. Keep priority items at the top. Log completed changes below.
@@ -27,6 +63,11 @@ Open Source Fleet & Asset Intelligence Platform — a self-hostable Traccar alte
 
 ### Agent Change Log
 <!-- Agents log their changes here with date/description -->
+- 2026-06-14 — GitHub OAuth2 provider testing + API key auth + generic DB provider routes
+- 2026-06-14 — Pagination on all list endpoints + request IDs on all responses + API auth lockdown
+- 2026-06-14 — SSO settings panel (frontend CRUD UI for LDAP/OIDC/OAuth2/SAML provider config)
+- 2026-06-14 — Pluggable auth system: LDAP, OIDC, OAuth2, SAML strategies + Keycloak + SSO login page
+- 2026-06-14 — Playback keyboard controls (Space, arrow keys, 1-6 for speed, Esc), shortcut hint bar, follow-mode button
 - 2026-06-14 — Redis integration: persistent trip detection, async geocode queue, WebSocket fan-out, rate limiting
 - 2026-06-14 — Error handling middleware (AppError class + global error handler), removed redundant try/catch from all routes
 - 2026-06-14 — Fix TypeScript strict mode: eliminated all `any` types across server codebase
@@ -237,8 +278,8 @@ Frontend has its own types in `app/src/types/index.ts` (older/separate — consi
 - [x] Fix TypeScript strict mode issues (implicit any, etc.)
 - [x] Add error handling middleware
 - [x] Pluggable auth system (LDAP, OIDC, OAuth2, SAML) + SSO settings panel
-- [ ] Add request logging / request IDs
-- [ ] Add pagination to list endpoints
+- [x] Add request logging / request IDs (X-Request-Id header + requestId in error responses)
+- [x] Add pagination to list endpoints (page/limit query params, PaginatedResponse format)
 
 ### 5. Trip detection improvement
 - [ ] Add ignition-based trip detection
@@ -282,6 +323,10 @@ Frontend has its own types in `app/src/types/index.ts` (older/separate — consi
 - Registration creates tenant → schema → admin user
 
 **Isolation:** No shared data between tenants. Schema-level backups. Independent migration versions.
+
+## Important Warnings
+
+- **DO NOT modify `app/vite.config.ts`** unless explicitly instructed by the user. It contains `allowedHosts` and proxy settings that are critical for the deployment. Changing it will break frontend access.
 
 ## Coding Conventions
 

@@ -1,6 +1,19 @@
 import { useEffect, useState } from 'react'
 import { getAuthToken } from '../../lib/auth'
 
+function authFetch(path: string) {
+  const token = getAuthToken()
+  return fetch(path, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+}
+
+function extractData(res: any): any[] {
+  if (res && typeof res === 'object' && 'data' in res && Array.isArray(res.data)) return res.data
+  if (Array.isArray(res)) return res
+  return []
+}
+
 interface MaintItem {
   id: string; deviceId: string; name: string; type: string
   intervalDays: number | null; intervalMeters: number | null
@@ -23,8 +36,8 @@ export default function MaintPanel({ showToast }: MaintPanelProps) {
   const [form, setForm] = useState({ deviceId: '', name: '', type: 'other', notes: '' })
 
   useEffect(() => {
-    fetch('/api/maintenance').then(r => r.json()).then(setItems).catch(() => {})
-    fetch('/api/devices').then(r => r.json()).then(setDevices).catch(() => {})
+    authFetch('/api/maintenance').then(r => r.json()).then(data => setItems(extractData(data))).catch(() => {})
+    authFetch('/api/devices').then(r => r.json()).then(data => setDevices(extractData(data))).catch(() => {})
   }, [])
 
   const addItem = async () => {

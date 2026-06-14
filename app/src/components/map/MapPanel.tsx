@@ -65,6 +65,42 @@ function batteryColor(level: number | null): string {
   return '#EF4444'
 }
 
+interface MapLayerDef {
+  url: string;
+  attr: string;
+  maxZoom: number;
+  opacity?: number;
+}
+
+interface MapStyleDef {
+  id: string;
+  label: string;
+  layers: MapLayerDef[];
+}
+
+const MAP_STYLES: MapStyleDef[] = [
+  {
+    id: 'osm', label: 'Street',
+    layers: [{ url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', attr: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>', maxZoom: 19 }],
+  },
+  {
+    id: 'satellite', label: 'Satellite',
+    layers: [
+      { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attr: '© Esri', maxZoom: 18 },
+    ],
+  },
+  {
+    id: 'voyager', label: 'Voyager',
+    layers: [{ url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', attr: '© <a href="https://carto.com/attributions">CARTO</a>', maxZoom: 19 }],
+  },
+  {
+    id: 'topo', label: 'Topo',
+    layers: [{ url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', attr: '© <a href="https://opentopomap.org">OpenTopoMap</a>', maxZoom: 17 }],
+  },
+]
+
+type MapStyleId = MapStyleDef['id']
+
 const MapPanel = forwardRef<MapPanelHandle, MapPanelProps>(function MapPanel({ devices: devicesProp, trips: tripsProp, onRenameDevice, onDeleteDevice }, ref) {
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -73,10 +109,33 @@ const MapPanel = forwardRef<MapPanelHandle, MapPanelProps>(function MapPanel({ d
   const [pb, setPb] = useState<PlaybackState | null>(null);
   const activeTripLayers = useRef<L.Layer[]>([]);
   const pbDoneLine = useRef<L.Polyline | null>(null);
+  const tileLayersRef = useRef<L.TileLayer[]>([]);
 
   const [showAssets, setShowAssets] = useState(true)
+  const [mapStyle, setMapStyle] = useState<MapStyleId>('osm')
+  const [showLayers, setShowLayers] = useState(false)
   const deviceArr = devicesProp || []
   const tripsArr = tripsProp || []
+
+  // Close layers dropdown on outside click
+  useEffect(() => {
+    if (!showLayers) return
+    const close = () => setShowLayers(false)
+    window.addEventListener('click', close)
+    return () => window.removeEventListener('click', close)
+  }, [showLayers])
+
+  const switchMapStyle = useCallback((styleId: MapStyleId) => {
+    const style = MAP_STYLES.find(s => s.id === styleId)
+    if (!style || !mapRef.current) return
+    for (const layer of tileLayersRef.current) {
+      mapRef.current.removeLayer(layer)
+    }
+    tileLayersRef.current = style.layers.map(l =>
+      L.tileLayer(l.url, { attribution: l.attr, maxZoom: l.maxZoom, opacity: l.opacity ?? 1 }).addTo(mapRef.current!)
+    )
+    setMapStyle(styleId)
+  }, [])
 
   const clearTripLayers = useCallback(() => {
     activeTripLayers.current.forEach(l => { try { mapRef.current?.removeLayer(l); } catch {} });
@@ -87,19 +146,45 @@ const MapPanel = forwardRef<MapPanelHandle, MapPanelProps>(function MapPanel({ d
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
     const map = L.map(mapContainerRef.current, {
-      center: [47.718, -116.945],
-      zoom: 11,
+      center: [20, 0],
+      zoom: 2,
       zoomControl: true,
     });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    const tile = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       maxZoom: 19,
     }).addTo(map);
+    tileLayersRef.current = [tile];
     mapRef.current = map;
+
+    // My Location button
+    const LocateControl = L.Control.extend({
+      onAdd() {
+        const btn = document.createElement('button')
+        btn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>'
+        btn.title = 'Show my location'
+        btn.className = 'leaflet-control-zoom leaflet-bar leaflet-control'
+        btn.style.cssText = 'width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:#1E293B;border:1px solid #334155;border-radius:4px;color:#E2E8F0;margin-bottom:4px'
+        btn.onmouseenter = () => { btn.style.background = '#334155' }
+        btn.onmouseleave = () => { btn.style.background = '#1E293B' }
+        btn.onclick = () => {
+          if (!map) return
+          map.locate({ setView: true, maxZoom: 15 })
+        }
+        return btn
+      },
+    })
+    new LocateControl({ position: 'bottomright' }).addTo(map)
+
+    // Try browser location on load
+    map.on('locationfound', (e: any) => {
+      L.circleMarker(e.latlng, { radius: 8, color: '#00D4FF', fillColor: '#00D4FF', fillOpacity: 0.3, weight: 2 }).addTo(map)
+    })
 
     return () => {
       map.remove();
       mapRef.current = null;
+      tileLayersRef.current = [];
     };
   }, []);
 
@@ -110,13 +195,11 @@ const MapPanel = forwardRef<MapPanelHandle, MapPanelProps>(function MapPanel({ d
     markersRef.current.forEach(m => map.removeLayer(m));
     markersRef.current = [];
 
-    const defaultCenter = [47.718, -116.945] as [number, number];
-
     deviceArr.forEach((d, i) => {
       const isMoving = d.status === 'moving' || d.speed > 0;
       const batColor = batteryColor(d.battery);
       const batText = d.battery !== null ? `${Math.round(d.battery)}%` : 'N/A';
-      const marker = L.marker(d.latlng || defaultCenter, { icon: makeVehicleIcon(isMoving) })
+      const marker = L.marker(d.latlng, { icon: makeVehicleIcon(isMoving) })
         .addTo(map)
         .bindPopup(
           `<div style="font-weight:600;font-size:13px;margin-bottom:6px">${d.name}</div>
@@ -131,10 +214,6 @@ const MapPanel = forwardRef<MapPanelHandle, MapPanelProps>(function MapPanel({ d
       markersRef.current.push(marker);
     });
 
-    if (!deviceArr.length && !markersRef.current.length) {
-      const defaultMarker = L.marker(defaultCenter, { icon: makeVehicleIcon(false) }).addTo(map);
-      markersRef.current.push(defaultMarker);
-    }
   }, [deviceArr]);
 
   const pbSeek = useCallback((sec: number) => {
@@ -150,8 +229,13 @@ const MapPanel = forwardRef<MapPanelHandle, MapPanelProps>(function MapPanel({ d
     const { latlng, idx } = interpAtSec(pb.currentSec, pb.coords, pb.speeds, pb.totalDur);
     pb.vehicleMarker.setLatLng(latlng);
 
-    // Draw completed portion of the route
+    // Follow mode — keep vehicle centered (instant, no animation to avoid frame-interruption wobble)
     const map = mapRef.current;
+    if (map && pb.follow) {
+      map.setView(latlng, map.getZoom(), { animate: false });
+    }
+
+    // Draw completed portion of the route
     if (!map) return;
     if (pbDoneLine.current) { try { map.removeLayer(pbDoneLine.current); } catch {} }
     const doneCoords = pb.coords.slice(0, Math.min(idx + 2, pb.coords.length));
@@ -195,7 +279,7 @@ const MapPanel = forwardRef<MapPanelHandle, MapPanelProps>(function MapPanel({ d
     }
 
     const newPb: PlaybackState = {
-      active: true, playing: false,
+      active: true, playing: false, follow: false,
       route: null, coords, speeds, speedLimits: limits, totalDur, currentSec: 0, speed: 5,
       rafId: null, lastTs: null, tripData: t, cumDist,
       fullLine: null, doneLine: null, vehicleMarker: null, startMarker: null, endMarker: null, segLayers: [],
@@ -298,8 +382,10 @@ const MapPanel = forwardRef<MapPanelHandle, MapPanelProps>(function MapPanel({ d
     <div id="panel-map" className="flex w-full h-full relative">
       <div className="map-area flex-1 relative overflow-hidden">
         <div ref={mapContainerRef} id="leaflet-map" className="w-full h-full" />
-        <PlaybackBar pb={pb} onSeek={pbSeek} />
+        <PlaybackBar pb={pb} onSeek={pbSeek} onSetFollow={(v) => setPb(prev => prev ? { ...prev, follow: v } : prev)} />
         {pb?.active ? null : <MapInfoCard {...infoCard} />}
+
+        {/* Show assets toggle */}
         {!showAssets && (
           <button
             onClick={() => setShowAssets(true)}
@@ -309,6 +395,34 @@ const MapPanel = forwardRef<MapPanelHandle, MapPanelProps>(function MapPanel({ d
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
           </button>
         )}
+
+        {/* Layers button + dropdown */}
+        <div className="absolute top-3 right-14 z-[1000] flex flex-col items-end" onClick={e => e.stopPropagation()}>
+          <button
+            onClick={() => setShowLayers(v => !v)}
+            className="px-2.5 py-1.5 rounded-lg bg-surface/80 border border-border text-text-muted hover:text-text cursor-pointer flex items-center gap-1.5 text-[11px] font-medium transition-colors shadow-lg backdrop-blur-sm"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            {MAP_STYLES.find(s => s.id === mapStyle)?.label}
+          </button>
+          <div
+            className={`mt-1 bg-surface/90 border border-border rounded-lg overflow-hidden shadow-lg backdrop-blur-sm transition-all duration-200 ${
+              showLayers ? 'opacity-100 max-h-[300px]' : 'opacity-0 max-h-0 pointer-events-none'
+            }`}
+          >
+            {MAP_STYLES.map(s => (
+              <button
+                key={s.id}
+                onClick={() => { switchMapStyle(s.id); setShowLayers(false) }}
+                className={`block w-full text-left px-3 py-1.5 text-[11px] font-medium cursor-pointer transition-colors border-b border-border/50 last:border-b-0 ${
+                  mapStyle === s.id
+                    ? 'bg-cyan-dim text-cyan'
+                    : 'text-text-muted hover:bg-surface-2 hover:text-text'
+                }`}
+              >{s.label}</button>
+            ))}
+          </div>
+        </div>
       </div>
       {showAssets && (
         <div className="relative">
