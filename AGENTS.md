@@ -184,6 +184,7 @@ Frontend has its own types in `app/src/types/index.ts` (older/separate — consi
 - [x] Server: GT06/Concox protocol parser + TCP server on port 5001
 - [x] Server: TK103 protocol parser + TCP server on port 5002
 - [x] Server: Teltonika Codec 8/8E protocol parser + TCP server on port 5056
+- [x] Server: Queclink protocol parser + TCP server on port 5004
 - [x] Infrastructure: Docker Compose (PostGIS, MinIO, Redis)
 - [x] Infrastructure: .gitignore (node_modules, dist, .env, *.log)
 
@@ -194,7 +195,7 @@ Frontend has its own types in `app/src/types/index.ts` (older/separate — consi
 - [x] GT06/Concox protocol parser + TCP server on port 5001
 - [x] TK103 protocol parser (Chinese GPS trackers) on port 5002
 - [x] Teltonika Codec 8/8E protocol parser on port 5056
-- [ ] Queclink protocol family
+- [x] Queclink protocol parser on port 5004
 - [ ] OBD-II ELM327 parser (vehicle telemetry)
 - [ ] Document protocol plugin interface
 

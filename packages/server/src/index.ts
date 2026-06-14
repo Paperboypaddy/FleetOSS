@@ -15,6 +15,7 @@ import { nmeaHandler } from './ingestion/handlers/nmea-handler.js';
 import { gt06Handler } from './ingestion/handlers/gt06-handler.js';
 import { tk103Handler } from './ingestion/handlers/tk103-handler.js';
 import { teltonikaHandler } from './ingestion/handlers/teltonika-handler.js';
+import { queclinkHandler } from './ingestion/handlers/queclink-handler.js';
 import { getPool } from './db/connection.js';
 
 async function main() {
@@ -75,6 +76,7 @@ async function main() {
     [5100, 'NMEA', nmeaHandler],
     [5001, 'GT06/Concox', gt06Handler],
     [5002, 'TK103', tk103Handler],
+    [5004, 'Queclink', queclinkHandler],
     [5056, 'Teltonika', teltonikaHandler],
   ];
   for (const [port, label, handler] of protocolPorts) {
