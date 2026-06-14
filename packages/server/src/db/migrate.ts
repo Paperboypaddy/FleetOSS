@@ -117,6 +117,41 @@ async function migrate() {
       )
     `);
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS maintenance (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        device_id UUID NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL DEFAULT 'other' CHECK (type IN ('oil', 'tires', 'brakes', 'service', 'inspection', 'other')),
+        interval_days INTEGER,
+        interval_meters INTEGER,
+        last_odometer DOUBLE PRECISION,
+        last_date TIMESTAMPTZ,
+        due_odometer DOUBLE PRECISION,
+        due_date TIMESTAMPTZ,
+        notes TEXT,
+        attributes JSONB NOT NULL DEFAULT '{}',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS fuel_entries (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        device_id UUID NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+        date TIMESTAMPTZ NOT NULL,
+        odometer DOUBLE PRECISION,
+        gallons DOUBLE PRECISION NOT NULL,
+        price_per_gallon DOUBLE PRECISION,
+        mpg DOUBLE PRECISION,
+        station TEXT,
+        notes TEXT,
+        attributes JSONB NOT NULL DEFAULT '{}',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
     console.log('Migration complete');
   } finally {
     client.release();

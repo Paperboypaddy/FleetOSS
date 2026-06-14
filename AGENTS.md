@@ -25,6 +25,7 @@ Open Source Fleet & Asset Intelligence Platform — a self-hostable Traccar alte
 ### Agent Change Log
 <!-- Agents log their changes here with date/description -->
 - 2026-06-14 — Device approval flow: `approved` column/flag, unapproved devices hidden from map, Settings → Devices shows "Devices Awaiting Approval" with Add button
+- 2026-06-14 — Geofences/Events/Maintenance/Fuel CRUD APIs + real frontend panels
 - 2026-06-14 — TK103 + Teltonika Codec 8 protocol parsers on ports 5002, 5056
 - 2026-06-14 — NMEA/GPRMC protocol parser + TCP server on port 5100
 - 2026-06-14 — Custom site name and logo upload in General settings
@@ -149,6 +150,8 @@ Frontend has its own types in `app/src/types/index.ts` (older/separate — consi
 - [x] Frontend: WebSocket live position updates on map
 - [x] Frontend: API client with auth headers, fallback to empty arrays on error
 - [x] Frontend: Car icon in sidebar, uploaded logo in topbar
+- [x] Frontend: Maintenance panel with real API data
+- [x] Frontend: Fuel panel with real API data (log fill-ups)
 - [x] Frontend: Collapsible asset sidebar for mobile
 - [x] Frontend: Rename/delete devices inline
 - [x] Frontend: Battery level display, last seen timestamps
@@ -200,13 +203,13 @@ Frontend has its own types in `app/src/types/index.ts` (older/separate — consi
 - [ ] Document protocol plugin interface
 
 ### 2. API completeness
-- [ ] Geofences CRUD API
-- [ ] Events API
-- [ ] Maintenance API
-- [ ] Fuel entries API
+- [x] Geofences CRUD API
+- [x] Events API
+- [x] Maintenance API
+- [x] Fuel entries API
 
 ### 3. Frontend polish
-- [ ] Fuel/Maint panels wired to real data
+- [x] Fuel/Maint panels wired to real data
 - [ ] Dark/light theme toggle
 
 ### 4. Server polish

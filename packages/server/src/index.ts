@@ -8,6 +8,10 @@ import { registerPositionRoutes } from './api/routes/positions.js';
 import { registerTripRoutes } from './api/routes/trips.js';
 import { registerAuthRoutes } from './auth/index.js';
 import { registerUserRoutes } from './api/routes/users.js';
+import { registerGeofenceRoutes } from './api/routes/geofences.js';
+import { registerEventRoutes } from './api/routes/events.js';
+import { registerMaintenanceRoutes } from './api/routes/maintenance.js';
+import { registerFuelRoutes } from './api/routes/fuel.js';
 import { registerStatsRoutes } from './api/routes/stats.js';
 import { registerRealtime } from './realtime/index.js';
 import { startTcpServer } from './ingestion/tcp-server.js';
@@ -46,6 +50,10 @@ async function main() {
   registerPositionRoutes(app);
   registerTripRoutes(app);
   registerUserRoutes(app);
+  registerGeofenceRoutes(app);
+  registerEventRoutes(app);
+  registerMaintenanceRoutes(app);
+  registerFuelRoutes(app);
   registerStatsRoutes(app);
   registerRealtime(app);
 

@@ -92,3 +92,34 @@ export const events = pgTable('events', {
   attributes: jsonb('attributes').default({}).notNull(),
   time: timestamp('time', { withTimezone: true }).defaultNow().notNull(),
 });
+
+export const maintenance = pgTable('maintenance', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  deviceId: uuid('device_id').notNull().references(() => devices.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  type: text('type', { enum: ['oil', 'tires', 'brakes', 'service', 'inspection', 'other'] }).default('other').notNull(),
+  intervalDays: integer('interval_days'),
+  intervalMeters: integer('interval_meters'),
+  lastOdometer: doublePrecision('last_odometer'),
+  lastDate: timestamp('last_date', { withTimezone: true }),
+  dueOdometer: doublePrecision('due_odometer'),
+  dueDate: timestamp('due_date', { withTimezone: true }),
+  notes: text('notes'),
+  attributes: jsonb('attributes').default({}).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const fuelEntries = pgTable('fuel_entries', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  deviceId: uuid('device_id').notNull().references(() => devices.id, { onDelete: 'cascade' }),
+  date: timestamp('date', { withTimezone: true }).notNull(),
+  odometer: doublePrecision('odometer'),
+  gallons: doublePrecision('gallons').notNull(),
+  pricePerGallon: doublePrecision('price_per_gallon'),
+  mpg: doublePrecision('mpg'),
+  station: text('station'),
+  notes: text('notes'),
+  attributes: jsonb('attributes').default({}).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
