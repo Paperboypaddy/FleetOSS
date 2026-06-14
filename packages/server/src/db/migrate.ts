@@ -60,7 +60,11 @@ async function migrate() {
     `);
 
     await client.query(`CREATE INDEX IF NOT EXISTS idx_positions_device_time ON positions (device_id, device_timestamp DESC)`);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_positions_geom ON positions USING GIST (ST_SetSRID(ST_MakePoint(longitude, latitude), 4326))`);
+    try {
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_positions_geom ON positions USING GIST (ST_SetSRID(ST_MakePoint(longitude, latitude), 4326))`);
+    } catch {
+      console.warn('PostGIS geospatial index not created (PostGIS not available)');
+    }
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS trips (
