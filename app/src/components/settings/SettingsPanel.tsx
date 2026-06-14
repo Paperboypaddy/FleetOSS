@@ -33,6 +33,8 @@ export default function SettingsPanel({ showToast }: { showToast: (msg: string) 
   const [creating, setCreating] = useState(false)
   const [siteName, setSiteName] = useState(localStorage.getItem('fleetoss-site-name') || 'FleetOSS')
   const [logo, setLogo] = useState<string | null>(localStorage.getItem('fleetoss-logo'))
+  const [newDevice, setNewDevice] = useState({ uniqueId: '', name: '' })
+  const [registering, setRegistering] = useState(false)
 
   useEffect(() => {
     fetch('/api/stats').then(r => r.json()).then(setStats).catch(() => {})
@@ -54,6 +56,28 @@ export default function SettingsPanel({ showToast }: { showToast: (msg: string) 
         showToast(err.error || 'Failed to add device')
       }
     } catch { showToast('Failed to add device') }
+  }
+
+  const registerDevice = async () => {
+    if (!newDevice.uniqueId.trim()) return
+    setRegistering(true)
+    try {
+      const res = await authFetch('/api/devices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uniqueId: newDevice.uniqueId.trim(), name: newDevice.name.trim() || newDevice.uniqueId.trim() }),
+      })
+      if (res.ok) {
+        const d = await res.json()
+        setDevices(prev => [...prev, d])
+        setNewDevice({ uniqueId: '', name: '' })
+        showToast(`Registered "${d.name}"`)
+      } else {
+        const err = await res.json()
+        showToast(err.error || 'Failed to register device')
+      }
+    } catch { showToast('Failed to register device') }
+    setRegistering(false)
   }
 
   const createUser = async () => {
@@ -149,25 +173,16 @@ export default function SettingsPanel({ showToast }: { showToast: (msg: string) 
             <div className="bg-surface border border-border rounded-lg p-4 mb-6">
               <h2 className="text-sm font-semibold mb-3">Branding</h2>
               <div className="flex items-start gap-6 flex-wrap">
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div className="flex flex-col gap-1 flex-1">
-                    <label className="text-[10px] text-text-muted">Site Name</label>
-                    <input
-                      className="bg-surface-2 border border-border rounded px-2.5 py-1.5 text-xs text-text outline-none focus:border-cyan w-full max-w-xs"
-                      value={siteName}
-                      onChange={e => {
-                        setSiteName(e.target.value)
-                        localStorage.setItem('fleetoss-site-name', e.target.value)
-                      }}
-                    />
-                  </div>
-                  <button
-                    className="px-3 py-1.5 rounded-lg bg-transparent text-text-dim border border-border text-xs cursor-pointer hover:bg-surface-2 transition-colors self-end"
-                    onClick={() => {
-                      setSiteName('FleetOSS')
-                      localStorage.removeItem('fleetoss-site-name')
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] text-text-muted">Site Name</label>
+                  <input
+                    className="bg-surface-2 border border-border rounded px-2.5 py-1.5 text-xs text-text outline-none focus:border-cyan w-44"
+                    value={siteName}
+                    onChange={e => {
+                      setSiteName(e.target.value)
+                      localStorage.setItem('fleetoss-site-name', e.target.value)
                     }}
-                  >Reset</button>
+                  />
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="flex flex-col gap-1">
@@ -321,6 +336,22 @@ export default function SettingsPanel({ showToast }: { showToast: (msg: string) 
           <div className="p-6">
             <h1 className="text-lg font-semibold mb-1">Devices</h1>
             <p className="text-xs text-text-muted mb-4">Add or configure devices</p>
+
+            {/* Add Device form */}
+            <div className="bg-surface border border-border rounded-lg p-4 mb-6">
+              <h2 className="text-sm font-semibold mb-3">Add Device</h2>
+              <div className="flex flex-wrap gap-2 items-end">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] text-text-muted">Unique ID</label>
+                  <input className="bg-surface-2 border border-border rounded px-2.5 py-1.5 text-xs text-text outline-none focus:border-cyan w-44" value={newDevice.uniqueId} onChange={e => setNewDevice(p => ({ ...p, uniqueId: e.target.value }))} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] text-text-muted">Name (optional)</label>
+                  <input className="bg-surface-2 border border-border rounded px-2.5 py-1.5 text-xs text-text outline-none focus:border-cyan w-36" value={newDevice.name} onChange={e => setNewDevice(p => ({ ...p, name: e.target.value }))} />
+                </div>
+                <button className="px-3.5 py-1.5 rounded-lg bg-cyan text-bg text-xs font-semibold border-none cursor-pointer hover:opacity-85 disabled:opacity-50" disabled={registering || !newDevice.uniqueId.trim()} onClick={registerDevice}>Register</button>
+              </div>
+            </div>
 
             {/* Unregistered devices */}
             {unregistered.length > 0 && (
