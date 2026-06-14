@@ -74,6 +74,7 @@ const MapPanel = forwardRef<MapPanelHandle, MapPanelProps>(function MapPanel({ d
   const activeTripLayers = useRef<L.Layer[]>([]);
   const pbDoneLine = useRef<L.Polyline | null>(null);
 
+  const [showAssets, setShowAssets] = useState(true)
   const deviceArr = devicesProp || []
   const tripsArr = tripsProp || []
 
@@ -250,14 +251,32 @@ const MapPanel = forwardRef<MapPanelHandle, MapPanelProps>(function MapPanel({ d
         <div ref={mapContainerRef} id="leaflet-map" className="w-full h-full" />
         <PlaybackBar pb={pb} onSeek={pbSeek} />
         <MapInfoCard {...infoCard} />
+        {!showAssets && (
+          <button
+            onClick={() => setShowAssets(true)}
+            className="absolute top-3 right-3 z-[1000] w-9 h-9 rounded-lg bg-surface border border-border text-text-muted hover:text-text cursor-pointer flex items-center justify-center text-sm transition-colors shadow-lg"
+            title="Show assets"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+          </button>
+        )}
       </div>
-      <DeviceList
-        devices={deviceArr}
-        selected={selectedDevice}
-        onSelect={selectDevice}
-        onRename={onRenameDevice}
-        onDelete={onDeleteDevice}
-      />
+      {showAssets && (
+        <div className="relative">
+          <button
+            onClick={() => setShowAssets(false)}
+            className="absolute -left-3 top-3 z-[1000] w-6 h-6 rounded-full bg-surface border border-border text-text-muted hover:text-text cursor-pointer flex items-center justify-center text-xs transition-colors shadow-lg"
+            title="Hide assets"
+          >{'◀'}</button>
+          <DeviceList
+            devices={deviceArr}
+            selected={selectedDevice}
+            onSelect={selectDevice}
+            onRename={onRenameDevice}
+            onDelete={onDeleteDevice}
+          />
+        </div>
+      )}
     </div>
   );
 });
