@@ -7,7 +7,6 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   release:
@@ -17,6 +16,10 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
+
+      - name: Lowercase repo name
+        id: repo
+        run: echo "name=${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -36,8 +39,8 @@ jobs:
           file: Dockerfile
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/server:${{ steps.version.outputs.VERSION }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/server:latest
+            ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}/server:${{ steps.version.outputs.VERSION }}
+            ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}/server:latest
 
       - name: Build and push app image
         uses: docker/build-push-action@v5
@@ -46,8 +49,8 @@ jobs:
           file: app/Dockerfile
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/app:${{ steps.version.outputs.VERSION }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/app:latest
+            ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}/app:${{ steps.version.outputs.VERSION }}
+            ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}/app:latest
 
       - name: Generate release notes
         id: notes
@@ -58,8 +61,8 @@ jobs:
           git log --oneline $(git tag --sort=-creatordate | head -2 | tail -1)..HEAD 2>/dev/null | sed 's/^/- /' >> /tmp/release.md || true
           echo "" >> /tmp/release.md
           echo "### Images" >> /tmp/release.md
-          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/server:${{ steps.version.outputs.VERSION }}\`" >> /tmp/release.md
-          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/app:${{ steps.version.outputs.VERSION }}\`" >> /tmp/release.md
+          echo "- \`${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}/server:${{ steps.version.outputs.VERSION }}\`" >> /tmp/release.md
+          echo "- \`${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}/app:${{ steps.version.outputs.VERSION }}\`" >> /tmp/release.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
