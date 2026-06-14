@@ -1,5 +1,7 @@
 const API = '/api'
-const WS = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws`
+// Connect WebSocket directly to the backend (not through Vite proxy)
+const BACKEND_PORT = 4000
+const WS = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.hostname}:${BACKEND_PORT}/ws`
 
 function authHeaders(): Record<string, string> {
   const token = localStorage.getItem('fleetoss-token')
@@ -204,18 +206,8 @@ export async function fetchDevices(): Promise<FrontendDevice[]> {
     }
     return result
   } catch (err) {
-    console.warn('Failed to fetch devices, using mock data fallback', err)
-    const { devices } = await import('../data/mockData')
-    return devices.map((d: any, i: number) => ({
-      apiId: `mock-${i}`,
-      name: d.name,
-      plate: d.plate,
-      status: d.status,
-      speed: d.speed,
-      battery: null,
-      latlng: d.latlng,
-      lastUpdate: null,
-    }))
+    console.warn('Failed to fetch devices', err)
+    return []
   }
 }
 
@@ -243,9 +235,8 @@ export async function fetchTrips(): Promise<FrontendTrip[]> {
     const nameMap = new Map(devices.map(d => [d.id, d.name]))
     return data.map(t => mapTrip(t, nameMap.get(t.deviceId) || t.deviceId))
   } catch (err) {
-    console.warn('Failed to fetch trips, using mock data fallback', err)
-    const { tripsData } = await import('../data/mockData')
-    return tripsData
+    console.warn('Failed to fetch trips', err)
+    return []
   }
 }
 
