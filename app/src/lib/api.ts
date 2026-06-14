@@ -100,6 +100,7 @@ export interface FrontendTrip {
   startSpeed: number
   endSpeed: number
   startTime: string
+  endTime: string
   type: 'Work' | 'Personal' | null
   purpose: string
   waypoints: [number, number][]
@@ -137,6 +138,7 @@ function mapTrip(api: ApiTrip, deviceName: string): FrontendTrip {
   const durHr = Math.floor(durMin / 60)
   const durStr = durHr > 0 ? `${durHr}:${String(durMin % 60).padStart(2, '0')}` : `0:${durMin}`
   const startTimeStr = `${String(startDate.getHours()).padStart(2, '0')}:${String(startDate.getMinutes()).padStart(2, '0')}`
+  const endTimeStr = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`
 
   const attrs = (api.attributes || {}) as Record<string, string>
   const tripType = (attrs.type === 'Work' || attrs.type === 'Personal') ? attrs.type : null
@@ -154,6 +156,7 @@ function mapTrip(api: ApiTrip, deviceName: string): FrontendTrip {
     startSpeed: 0,
     endSpeed: 0,
     startTime: startTimeStr,
+    endTime: endTimeStr,
     type: tripType as 'Work' | 'Personal' | null,
     purpose: attrs.purpose || '',
     waypoints: [[api.startLat, api.startLng], [api.endLat, api.endLng]],
@@ -220,7 +223,25 @@ export async function fetchTrips(): Promise<FrontendTrip[]> {
     const deviceRes = await fetch(`${API}/devices`)
     const devices: ApiDevice[] = deviceRes.ok ? await deviceRes.json() : []
     const nameMap = new Map(devices.map(d => [d.id, d.name]))
-    return data.map(t => mapTrip(t, nameMap.get(t.deviceId) || t.deviceId))
+    const trips = data.map(t => mapTrip(t, nameMap.get(t.deviceId) || t.deviceId))
+
+    // Auto-geocode start/end addresses (only if they're just coordinates)
+    for (const trip of trips) {
+      const startIsCoord = trip.from.includes(',') && !trip.from.includes(' ')
+      const endIsCoord = trip.to.includes(',') && !trip.to.includes(' ')
+      if (startIsCoord) {
+        const addr = await reverseGeocode(trip.waypoints[0][0], trip.waypoints[0][1])
+        if (addr) trip.from = `${addr.split(',')[0]}, ${trip.waypoints[0][0].toFixed(4)},${trip.waypoints[0][1].toFixed(4)}`
+      }
+      if (endIsCoord) {
+        const addr = await reverseGeocode(trip.waypoints[1][0], trip.waypoints[1][1])
+        if (addr) trip.to = `${addr.split(',')[0]}, ${trip.waypoints[1][0].toFixed(4)},${trip.waypoints[1][1].toFixed(4)}`
+      }
+      // Small delay to respect Nominatim rate limits
+      if (startIsCoord || endIsCoord) await new Promise(r => setTimeout(r, 200))
+    }
+
+    return trips
   } catch (err) {
     console.warn('Failed to fetch trips, using mock data fallback', err)
     const { tripsData } = await import('../data/mockData')
