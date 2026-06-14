@@ -282,7 +282,7 @@ const MapPanel = forwardRef<MapPanelHandle, MapPanelProps>(function MapPanel({ d
       <div className="map-area flex-1 relative overflow-hidden">
         <div ref={mapContainerRef} id="leaflet-map" className="w-full h-full" />
         <PlaybackBar pb={pb} onSeek={pbSeek} />
-        <MapInfoCard {...infoCard} />
+        {pb?.active ? null : <MapInfoCard {...infoCard} />}
         {!showAssets && (
           <button
             onClick={() => setShowAssets(true)}

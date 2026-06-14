@@ -45,6 +45,31 @@ export function registerTripRoutes(app: FastifyInstance) {
     }
   });
 
+  // Update trip metadata (type, purpose, etc.)
+  app.patch<{
+    Params: { id: string }
+    Body: { type?: string; purpose?: string }
+  }>('/api/trips/:id', async (request, reply) => {
+    try {
+      const db = getDb();
+      const existing = await db.select().from(trips).where(eq(trips.id, request.params.id)).limit(1);
+      if (existing.length === 0) return reply.code(404).send({ error: 'Trip not found' });
+
+      const attrs = { ...(existing[0].attributes as Record<string, unknown> || {}) };
+      if (request.body.type) attrs.type = request.body.type;
+      if (request.body.purpose !== undefined) attrs.purpose = request.body.purpose;
+
+      const result = await db.update(trips)
+        .set({ attributes: attrs })
+        .where(eq(trips.id, request.params.id))
+        .returning();
+      return reply.send(result[0]);
+    } catch (err: any) {
+      request.log.error(err, 'Failed to update trip');
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
   // Get trips for a specific device
   app.get<{
     Params: { deviceId: string }

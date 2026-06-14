@@ -100,7 +100,7 @@ export interface FrontendTrip {
   startSpeed: number
   endSpeed: number
   startTime: string
-  type: 'Work' | 'Personal'
+  type: 'Work' | 'Personal' | null
   purpose: string
   waypoints: [number, number][]
   apiId?: string
@@ -138,6 +138,9 @@ function mapTrip(api: ApiTrip, deviceName: string): FrontendTrip {
   const durStr = durHr > 0 ? `${durHr}:${String(durMin % 60).padStart(2, '0')}` : `0:${durMin}`
   const startTimeStr = `${String(startDate.getHours()).padStart(2, '0')}:${String(startDate.getMinutes()).padStart(2, '0')}`
 
+  const attrs = (api.attributes || {}) as Record<string, string>
+  const tripType = (attrs.type === 'Work' || attrs.type === 'Personal') ? attrs.type : null
+
   return {
     date: startDate.toISOString().split('T')[0],
     vehicle: deviceName,
@@ -151,8 +154,8 @@ function mapTrip(api: ApiTrip, deviceName: string): FrontendTrip {
     startSpeed: 0,
     endSpeed: 0,
     startTime: startTimeStr,
-    type: 'Work',
-    purpose: '',
+    type: tripType as 'Work' | 'Personal' | null,
+    purpose: attrs.purpose || '',
     waypoints: [[api.startLat, api.startLng], [api.endLat, api.endLng]],
     apiId: api.id,
     deviceId: api.deviceId,
@@ -228,6 +231,28 @@ export async function fetchTrips(): Promise<FrontendTrip[]> {
 export interface TripPoint {
   latlng: [number, number]
   speed: number
+}
+
+export async function updateTrip(tripId: string, data: { type?: string; purpose?: string }): Promise<void> {
+  await fetch(`${API}/trips/${tripId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+}
+
+export async function reverseGeocode(lat: number, lng: number): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`,
+      { headers: { 'Accept-Language': 'en' } },
+    )
+    if (!res.ok) return null
+    const data = await res.json()
+    return data.display_name || null
+  } catch {
+    return null
+  }
 }
 
 export async function fetchTripPositions(deviceId: string, from: string, to: string): Promise<TripPoint[]> {
