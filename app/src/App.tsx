@@ -11,7 +11,7 @@ import Toast from './components/ui/Toast';
 import LoginPage from './components/auth/LoginPage';
 import { AuthProvider, useAuth } from './lib/auth';
 import type { PanelId } from './types';
-import { fetchDevices, fetchTrips, connectWebSocket, renameDevice, deleteDevice, fetchTripPositions } from './lib/api';
+import { fetchDevices, fetchTrips, connectWebSocket, renameDevice, deleteDevice, fetchTripPositions, prepareSpeedLimitFetch, applySpeedLimits } from './lib/api';
 import type { FrontendDevice, FrontendTrip, ApiPosition, TripPoint } from './lib/api';
 
 function AppContent() {
@@ -67,6 +67,15 @@ function AppContent() {
     const spdLimits = points.length >= 2 ? points.map(p => p.speedLimit) : []
     await new Promise(r => setTimeout(r, 100))
     mapRef.current?.showTripOnMap(trip, wpts, spds, spdLimits)
+
+    // Fetch speed limits in background (non-blocking)
+    const sample = prepareSpeedLimitFetch(points)
+    if (sample) {
+      applySpeedLimits(points, sample.coords, sample.indices).then(() => {
+        const updatedLimits = points.map(p => p.speedLimit)
+        mapRef.current?.updateSpeedLimits(updatedLimits)
+      })
+    }
   }, [])
 
   const handleRenameDevice = useCallback(async (deviceId: string, newName: string) => {

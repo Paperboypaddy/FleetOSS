@@ -299,55 +299,54 @@ export async function fetchTripPositions(deviceId: string, from: string, to: str
     const res = await apiFetch(`/devices/${deviceId}/positions?from=${fromParam}&to=${toParam}&limit=1000`)
     if (!res.ok) return []
     const positions: ApiPosition[] = await res.json()
-    const points = positions.reverse().map(p => ({
+    return positions.reverse().map(p => ({
       latlng: [p.latitude, p.longitude] as [number, number],
       speed: (p.speed != null && p.speed >= 0) ? Math.round(p.speed) : 0,
       speedLimit: undefined as number | undefined | null,
     }))
-
-    // Fetch speed limits for the route (sample every ~10 points to reduce API load)
-    if (points.length > 5) {
-      const sampleStep = Math.max(1, Math.floor(points.length / 50))
-      const sampleCoords: [number, number][] = []
-      const sampleIndices: number[] = []
-      for (let i = 0; i < points.length; i += sampleStep) {
-        sampleCoords.push(points[i].latlng)
-        sampleIndices.push(i)
-      }
-      try {
-        const slRes = await fetch('/api/speedlimits', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ coords: sampleCoords }),
-        })
-        if (slRes.ok) {
-          const { limits } = await slRes.json()
-          for (let j = 0; j < sampleIndices.length; j++) {
-            points[sampleIndices[j]].speedLimit = limits[j]
-          }
-          // Fill gaps between sampled points
-          let lastLimit: number | null | undefined
-          let nextLimit: number | null | undefined
-          for (let i = 0; i < points.length; i++) {
-            if (points[i].speedLimit !== undefined) {
-              lastLimit = points[i].speedLimit
-            }
-            // Find next defined limit
-            let nextIdx = i + 1
-            while (nextIdx < points.length && points[nextIdx].speedLimit === undefined) nextIdx++
-            nextLimit = nextIdx < points.length ? points[nextIdx].speedLimit : lastLimit
-            if (points[i].speedLimit === undefined) {
-              points[i].speedLimit = lastLimit ?? nextLimit ?? null
-            }
-          }
-        }
-      } catch {}
-    }
-
-    return points
   } catch {
     return []
   }
+}
+
+// Fetch speed limits for trip points (non-blocking — call after showing trip)
+// Returns the sampled coordinate pairs and a callback to apply results
+export function prepareSpeedLimitFetch(points: TripPoint[], maxSamples = 15):
+  { coords: [number, number][]; indices: number[] } | null {
+  if (points.length < 5) return null
+  const step = Math.max(1, Math.floor(points.length / maxSamples))
+  const coords: [number, number][] = []
+  const indices: number[] = []
+  for (let i = 0; i < points.length; i += step) {
+    coords.push(points[i].latlng)
+    indices.push(i)
+  }
+  return { coords, indices }
+}
+
+export async function applySpeedLimits(points: TripPoint[], sampleCoords: [number, number][], sampleIndices: number[]): Promise<void> {
+  try {
+    const res = await fetch('/api/speedlimits', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ coords: sampleCoords }),
+    })
+    if (!res.ok) return
+    const { limits } = await res.json()
+    for (let j = 0; j < sampleIndices.length; j++) {
+      points[sampleIndices[j]].speedLimit = limits[j]
+    }
+    // Fill gaps
+    let last: number | null | undefined
+    let next: number | null | undefined
+    for (let i = 0; i < points.length; i++) {
+      if (points[i].speedLimit !== undefined) last = points[i].speedLimit
+      let ni = i + 1
+      while (ni < points.length && points[ni].speedLimit === undefined) ni++
+      next = ni < points.length ? points[ni].speedLimit : last
+      if (points[i].speedLimit === undefined) points[i].speedLimit = last ?? next ?? null
+    }
+  } catch {}
 }
 
 export function connectWebSocket(onPosition: (pos: ApiPosition) => void): WebSocket | null {

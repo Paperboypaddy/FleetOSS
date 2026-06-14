@@ -34,7 +34,7 @@ function parseSpeed(raw: string): number | null {
 }
 
 let lastRequestTime = 0
-const MIN_REQUEST_INTERVAL = 500 // ms between Overpass requests
+const MIN_REQUEST_INTERVAL = 300 // ms between Overpass requests
 
 async function queryOverpass(query: string): Promise<any> {
   const now = Date.now()

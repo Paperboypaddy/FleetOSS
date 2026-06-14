@@ -11,6 +11,7 @@ import { timeAgo } from '../../lib/api';
 
 export interface MapPanelHandle {
   showTripOnMap: (trip: FrontendTrip, waypoints: [number, number][], actualSpeeds?: number[], speedLimits?: (number | null | undefined)[]) => Promise<void>;
+  updateSpeedLimits: (limits: (number | null | undefined)[]) => void;
 }
 
 interface MapPanelProps {
@@ -255,7 +256,14 @@ const MapPanel = forwardRef<MapPanelHandle, MapPanelProps>(function MapPanel({ d
     setPb(newPb);
   }, [clearTripLayers, pbSeek]);
 
-  useImperativeHandle(ref, () => ({ showTripOnMap }), [showTripOnMap]);
+  const updateSpeedLimits = useCallback((limits: (number | null | undefined)[]) => {
+    setPb(prev => {
+      if (!prev) return prev;
+      return { ...prev, speedLimits: limits };
+    });
+  }, []);
+
+  useImperativeHandle(ref, () => ({ showTripOnMap, updateSpeedLimits }), [showTripOnMap, updateSpeedLimits]);
 
   const selectDevice = useCallback((i: number) => {
     const d = deviceArr[i];
