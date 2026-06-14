@@ -10,7 +10,7 @@ import type { FrontendDevice, FrontendTrip } from '../../lib/api';
 import { timeAgo } from '../../lib/api';
 
 export interface MapPanelHandle {
-  showTripOnMap: (trip: FrontendTrip, waypoints: [number, number][]) => Promise<void>;
+  showTripOnMap: (trip: FrontendTrip, waypoints: [number, number][], actualSpeeds?: number[]) => Promise<void>;
 }
 
 interface MapPanelProps {
@@ -159,7 +159,7 @@ const MapPanel = forwardRef<MapPanelHandle, MapPanelProps>(function MapPanel({ d
     }
   }, [pb?.currentSec, pb?.active]);
 
-  const showTripOnMap = useCallback(async (trip: FrontendTrip, wpts: [number, number][]) => {
+  const showTripOnMap = useCallback(async (trip: FrontendTrip, wpts: [number, number][], actualSpeeds?: number[]) => {
     clearTripLayers();
     setPb(null);
     const t = trip;
@@ -167,21 +167,28 @@ const MapPanel = forwardRef<MapPanelHandle, MapPanelProps>(function MapPanel({ d
 
     // Downsample to ~200 points max for performance
     let coords = wpts;
+    let speeds: number[];
     if (coords.length > 200) {
       const step = coords.length / 200;
-      coords = Array.from({ length: 200 }, (_, i) => coords[Math.min(Math.floor(i * step), coords.length - 1)]);
+      const indices = Array.from({ length: 200 }, (_, i) => Math.min(Math.floor(i * step), coords.length - 1));
+      coords = indices.map(i => wpts[i]);
+      speeds = actualSpeeds?.length ? indices.map(i => actualSpeeds[i]) : [];
+    } else {
+      speeds = actualSpeeds || [];
     }
 
     const totalDur = t.durationSec;
     const cumDist = buildCumDist(coords);
-    // Build speed profile: use actual trip avg/max with simulated curve
-    const speeds = coords.map((_, i) => {
-      const pct = i / Math.max(coords.length - 1, 1);
-      if (pct < 0.15) return Math.round(t.avg * (pct / 0.15));
-      if (pct < 0.4) return Math.round(t.avg + (t.max - t.avg) * ((pct - 0.15) / 0.25));
-      if (pct < 0.65) return Math.round(t.max - (t.max - t.avg) * ((pct - 0.4) / 0.25));
-      return Math.round(t.avg * (1 - (pct - 0.65) / 0.35));
-    });
+    // Use actual GPS speed readings, or fall back to a synthetic profile
+    if (!speeds.length) {
+      speeds = coords.map((_, i) => {
+        const pct = i / Math.max(coords.length - 1, 1);
+        if (pct < 0.15) return Math.round(t.avg * (pct / 0.15));
+        if (pct < 0.4) return Math.round(t.avg + (t.max - t.avg) * ((pct - 0.15) / 0.25));
+        if (pct < 0.65) return Math.round(t.max - (t.max - t.avg) * ((pct - 0.4) / 0.25));
+        return Math.round(t.avg * (1 - (pct - 0.65) / 0.35));
+      });
+    }
 
     const newPb: PlaybackState = {
       active: true, playing: false,

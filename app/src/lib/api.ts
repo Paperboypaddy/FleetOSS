@@ -225,14 +225,22 @@ export async function fetchTrips(): Promise<FrontendTrip[]> {
   }
 }
 
-export async function fetchTripPositions(deviceId: string, from: string, to: string): Promise<[number, number][]> {
+export interface TripPoint {
+  latlng: [number, number]
+  speed: number
+}
+
+export async function fetchTripPositions(deviceId: string, from: string, to: string): Promise<TripPoint[]> {
   try {
     const fromParam = encodeURIComponent(from)
     const toParam = encodeURIComponent(to)
     const res = await fetch(`${API}/devices/${deviceId}/positions?from=${fromParam}&to=${toParam}&limit=1000`)
     if (!res.ok) return []
     const positions: ApiPosition[] = await res.json()
-    return positions.reverse().map(p => [p.latitude, p.longitude] as [number, number])
+    return positions.reverse().map(p => ({
+      latlng: [p.latitude, p.longitude] as [number, number],
+      speed: (p.speed != null && p.speed >= 0) ? Math.round(p.speed) : 0,
+    }))
   } catch {
     return []
   }
