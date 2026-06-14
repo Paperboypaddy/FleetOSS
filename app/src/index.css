@@ -26,6 +26,23 @@ body {
   font-family: var(--font-sans);
 }
 
+.light {
+  --color-bg: #F8FAFC;
+  --color-surface: #FFFFFF;
+  --color-surface-2: #F1F5F9;
+  --color-border: #CBD5E1;
+  --color-cyan: #0284C7;
+  --color-cyan-dim: rgba(2, 132, 199, 0.1);
+  --color-amber: #D97706;
+  --color-amber-dim: rgba(217, 119, 6, 0.1);
+  --color-green: #059669;
+  --color-green-dim: rgba(5, 150, 105, 0.1);
+  --color-red: #DC2626;
+  --color-text: #0F172A;
+  --color-text-muted: #64748B;
+  --color-text-dim: #475569;
+}
+
 #root {
   height: 100vh;
   overflow: hidden;
@@ -68,3 +85,54 @@ body {
   font-size: 9px !important;
 }
 .leaflet-control-attribution a { color: var(--color-text-muted) !important; }
+
+.light .leaflet-popup-content-wrapper {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1) !important;
+}
+.light .leaflet-control-attribution {
+  background: rgba(255, 255, 255, 0.85) !important;
+}
+
+/* ── Color Themes ── */
+
+/* Default (Cyan) — already in @theme and .light above */
+
+/* Emerald */
+.theme-emerald {
+  --color-cyan: #10B981;
+  --color-cyan-dim: rgba(16, 185, 129, 0.12);
+}
+.light.theme-emerald {
+  --color-cyan: #059669;
+  --color-cyan-dim: rgba(5, 150, 105, 0.1);
+}
+
+/* Violet */
+.theme-violet {
+  --color-cyan: #8B5CF6;
+  --color-cyan-dim: rgba(139, 92, 246, 0.12);
+}
+.light.theme-violet {
+  --color-cyan: #7C3AED;
+  --color-cyan-dim: rgba(124, 58, 237, 0.1);
+}
+
+/* Rose */
+.theme-rose {
+  --color-cyan: #F43F5E;
+  --color-cyan-dim: rgba(244, 63, 94, 0.12);
+}
+.light.theme-rose {
+  --color-cyan: #E11D48;
+  --color-cyan-dim: rgba(225, 29, 72, 0.1);
+}
+
+/* Amber */
+.theme-amber {
+  --color-cyan: #F59E0B;
+  --color-cyan-dim: rgba(245, 158, 11, 0.12);
+}
+.light.theme-amber {
+  --color-cyan: #D97706;
+  --color-cyan-dim: rgba(217, 119, 6, 0.1);
+}

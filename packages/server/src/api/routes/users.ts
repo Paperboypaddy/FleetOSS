@@ -26,16 +26,16 @@ export function registerUserRoutes(app: FastifyInstance) {
         createdAt: users.createdAt,
       }).from(users).orderBy(users.createdAt);
       return reply.send(result);
-    } catch (err: any) {
+    } catch (err: unknown) {
       request.log.error(err, 'Failed to list users');
       return reply.code(500).send({ error: 'Internal server error' });
     }
   });
 
   // Create a new user
-  app.post('/api/users', async (request, reply) => {
+  app.post<{ Body: { email?: string; name?: string; password?: string; role?: string } }>('/api/users', async (request, reply) => {
     try {
-      const { email, name, password, role } = request.body as any;
+      const { email, name, password, role } = request.body;
       if (!email || !name || !password || password.length < 6) {
         return reply.code(400).send({ error: 'Email, name, and password (6+ chars) required' });
       }
@@ -47,8 +47,8 @@ export function registerUserRoutes(app: FastifyInstance) {
         id: users.id, email: users.email, name: users.name, role: users.role, createdAt: users.createdAt,
       });
       return reply.code(201).send(result[0]);
-    } catch (err: any) {
-      if (err.code === '23505') return reply.code(409).send({ error: 'Email already exists' });
+    } catch (err: unknown) {
+      if (err instanceof Error && 'code' in err && (err as Record<string, unknown>).code === '23505') return reply.code(409).send({ error: 'Email already exists' });
       request.log.error(err, 'Failed to create user');
       return reply.code(500).send({ error: 'Internal server error' });
     }
@@ -61,7 +61,7 @@ export function registerUserRoutes(app: FastifyInstance) {
       const result = await db.delete(users).where(eq(users.id, request.params.id)).returning();
       if (result.length === 0) return reply.code(404).send({ error: 'User not found' });
       return reply.code(204).send();
-    } catch (err: any) {
+    } catch (err: unknown) {
       request.log.error(err, 'Failed to delete user');
       return reply.code(500).send({ error: 'Internal server error' });
     }

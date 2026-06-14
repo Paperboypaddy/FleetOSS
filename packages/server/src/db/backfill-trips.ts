@@ -1,8 +1,17 @@
 import { getPool } from './connection.js';
 import { reverseGeocode } from '../core/geocode.js';
+import type { PoolClient } from 'pg';
 
 const MOVING_THRESHOLD = 2 // mph
 const STOP_GAP_SECONDS = 300 // 5 minutes — same as live trip detector
+
+interface BackfillPos {
+  id: string;
+  latitude: number;
+  longitude: number;
+  speed: number;
+  device_timestamp: string;
+}
 
 async function backfillTrips() {
   const pool = getPool();
@@ -30,10 +39,10 @@ async function backfillTrips() {
 
       if (positions.rows.length < 2) continue;
 
-      let tripStart: any = null;
-      let tripPositions: any[] = [];
+      let tripStart: BackfillPos | null = null;
+      let tripPositions: BackfillPos[] = [];
 
-      for (const pos of positions.rows) {
+      for (const pos of positions.rows as BackfillPos[]) {
         const ts = new Date(pos.device_timestamp).getTime();
 
         if (!tripStart) {
@@ -70,7 +79,7 @@ async function backfillTrips() {
   }
 }
 
-async function saveTrip(client: any, deviceId: string, tripPositions: any[]) {
+async function saveTrip(client: PoolClient, deviceId: string, tripPositions: BackfillPos[]) {
   const first = tripPositions[0];
   const last = tripPositions[tripPositions.length - 1];
   let distance = 0;

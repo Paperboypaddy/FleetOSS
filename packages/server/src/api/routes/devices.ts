@@ -17,8 +17,8 @@ export function registerDeviceRoutes(app: FastifyInstance) {
       if (!uniqueId?.trim()) return reply.code(400).send({ error: 'uniqueId is required' });
       const device = await createDevice(uniqueId.trim(), name?.trim() || uniqueId.trim());
       return reply.code(201).send(device);
-    } catch (err: any) {
-      if (err.message === 'Device with this ID already exists') {
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message === 'Device with this ID already exists') {
         return reply.code(409).send({ error: err.message });
       }
       request.log.error(err, 'Failed to create device');
@@ -45,7 +45,7 @@ export function registerDeviceRoutes(app: FastifyInstance) {
       if (!existing) return reply.code(404).send({ error: 'Device not found' });
       const device = await approveDevice(request.params.id);
       return reply.send(device);
-    } catch (err: any) {
+    } catch (err: unknown) {
       request.log.error(err, 'Failed to approve device');
       return reply.code(500).send({ error: 'Internal server error' });
     }
@@ -58,14 +58,14 @@ export function registerDeviceRoutes(app: FastifyInstance) {
       const existing = await getDeviceById(request.params.id);
       if (!existing) return reply.code(404).send({ error: 'Device not found' });
 
-      const updates: Record<string, any> = { updatedAt: new Date() };
+      const updates: Record<string, unknown> = { updatedAt: new Date() };
       if (request.body.name?.trim()) updates.name = request.body.name.trim();
       if (request.body.attributes) {
         updates.attributes = { ...(existing.attributes || {}), ...request.body.attributes };
       }
       const result = await db.update(devices).set(updates).where(eq(devices.id, request.params.id)).returning();
       return reply.send(result[0]);
-    } catch (err: any) {
+    } catch (err: unknown) {
       request.log.error(err, 'Failed to update device');
       return reply.code(500).send({ error: 'Internal server error' });
     }
@@ -78,7 +78,7 @@ export function registerDeviceRoutes(app: FastifyInstance) {
       if (!device) return reply.code(404).send({ error: 'Device not found' });
       await deleteDeviceById(request.params.id);
       return reply.code(204).send();
-    } catch (err: any) {
+    } catch (err: unknown) {
       request.log.error(err, 'Failed to delete device');
       return reply.code(500).send({ error: 'Internal server error' });
     }

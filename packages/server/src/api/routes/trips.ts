@@ -22,7 +22,7 @@ export function registerTripRoutes(app: FastifyInstance) {
         : await db.select().from(trips).orderBy(desc(trips.startTime)).limit(maxResults);
 
       return reply.send(results);
-    } catch (err: any) {
+    } catch (err: unknown) {
       request.log.error(err, 'Failed to fetch trips');
       return reply.code(500).send({ error: 'Internal server error' });
     }
@@ -39,7 +39,7 @@ export function registerTripRoutes(app: FastifyInstance) {
         return reply.code(404).send({ error: 'Trip not found' });
       }
       return reply.send(result[0]);
-    } catch (err: any) {
+    } catch (err: unknown) {
       request.log.error(err, 'Failed to fetch trip');
       return reply.code(500).send({ error: 'Internal server error' });
     }
@@ -64,7 +64,7 @@ export function registerTripRoutes(app: FastifyInstance) {
         .where(eq(trips.id, request.params.id))
         .returning();
       return reply.send(result[0]);
-    } catch (err: any) {
+    } catch (err: unknown) {
       request.log.error(err, 'Failed to update trip');
       return reply.code(500).send({ error: 'Internal server error' });
     }
@@ -88,7 +88,7 @@ export function registerTripRoutes(app: FastifyInstance) {
         .limit(maxResults);
 
       return reply.send(results);
-    } catch (err: any) {
+    } catch (err: unknown) {
       request.log.error(err, 'Failed to fetch device trips');
       return reply.code(500).send({ error: 'Internal server error' });
     }

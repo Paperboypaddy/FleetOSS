@@ -44,27 +44,35 @@ export async function handleTraccarIngest(request: FastifyRequest, reply: Fastif
 
     // Try Background Geolocation format (nested location.coords)
     // Used by transistorsoft/cordova-background-geolocation plugin
-    const body = request.body as Record<string, any> | null;
-    const deviceId = params.id || body?.device_id || body?.deviceId;
-    const location = body?.location;
-    const coords = location?.coords;
+    const body = request.body as Record<string, unknown> | null;
+    const deviceId = (params.id || (body?.['device_id'] as string) || (body?.['deviceId'] as string)) as string;
+    const location = body?.['location'] as Record<string, unknown> | undefined;
+    const coords = location?.['coords'] as Record<string, unknown> | undefined;
 
-    if (deviceId && coords?.latitude != null && coords?.longitude != null) {
+    const bLat = coords?.['latitude'] as number | undefined;
+    const bLng = coords?.['longitude'] as number | undefined;
+    if (deviceId && bLat != null && bLng != null) {
       // Background Geolocation sends speed in m/s — convert to mph
-      const speedMs = coords.speed
-      const speedMph = speedMs != null && speedMs >= 0 ? speedMs * 2.237 : undefined
+      const speedMs = coords?.['speed'] as number | undefined;
+      const speedMph = speedMs != null && speedMs >= 0 ? speedMs * 2.237 : undefined;
+      const heading = (coords?.['heading'] || coords?.['bearing']) as number | undefined;
+      const accuracy = coords?.['accuracy'] as number | undefined;
+      const battery = location?.['battery'] as Record<string, unknown> | undefined;
+      const batteryLevel = battery?.['level'] != null ? (battery['level'] as number) * 100 : undefined;
+      const odometer = location?.['odometer'] as number | undefined;
+      const timestamp = (location?.['timestamp'] as string) || new Date().toISOString();
 
       const bgData: import('@fleetoss/core').IngestedPosition = {
-        deviceId,
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-        altitude: coords.altitude,
+        deviceId: deviceId as string,
+        latitude: bLat,
+        longitude: bLng,
+        altitude: coords?.['altitude'] as number | undefined,
         speed: speedMph,
-        bearing: coords.heading || coords.bearing,
-        accuracy: coords.accuracy,
-        odometer: location.odometer,
-        batteryLevel: location.battery?.level != null ? location.battery.level * 100 : undefined,
-        timestamp: location.timestamp || new Date().toISOString(),
+        bearing: heading,
+        accuracy,
+        odometer,
+        batteryLevel,
+        timestamp,
       };
       const result = await ingestPosition(bgData, 'background-geolocation');
       return reply.code(201).send(result);
@@ -75,8 +83,8 @@ export async function handleTraccarIngest(request: FastifyRequest, reply: Fastif
       details: 'id, lat, and lon are required',
       received: Object.keys(params),
     });
-  } catch (err: any) {
-    if (err.message?.startsWith('Invalid coordinates')) {
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message?.startsWith('Invalid coordinates')) {
       return reply.code(400).send({ error: err.message });
     }
     request.log.error(err, 'Traccar ingestion failed');
@@ -91,9 +99,10 @@ export function registerIngestionRoutes(app: FastifyInstance) {
       const data = parseHttpJson(request.body);
       const result = await ingestPosition(data, 'http-json');
       return reply.code(201).send(result);
-    } catch (err: any) {
-      if (err.name === 'ZodError') {
-        return reply.code(400).send({ error: 'Validation failed', details: err.errors });
+    } catch (err: unknown) {
+      if (err instanceof Error && 'errors' in err && err.constructor.name === 'ZodError') {
+        const zodErr = err as { errors: unknown };
+        return reply.code(400).send({ error: 'Validation failed', details: zodErr.errors });
       }
       request.log.error(err, 'Ingestion failed');
       return reply.code(500).send({ error: 'Internal server error' });
@@ -111,9 +120,10 @@ export function registerIngestionRoutes(app: FastifyInstance) {
         results.push(result);
       }
       return reply.code(201).send(results);
-    } catch (err: any) {
-      if (err.name === 'ZodError') {
-        return reply.code(400).send({ error: 'Validation failed', details: err.errors });
+    } catch (err: unknown) {
+      if (err instanceof Error && 'errors' in err && err.constructor.name === 'ZodError') {
+        const zodErr = err as { errors: unknown };
+        return reply.code(400).send({ error: 'Validation failed', details: zodErr.errors });
       }
       request.log.error(err, 'Batch ingestion failed');
       return reply.code(500).send({ error: 'Internal server error' });

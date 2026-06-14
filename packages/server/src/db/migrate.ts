@@ -112,11 +112,18 @@ async function migrate() {
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         email TEXT NOT NULL UNIQUE,
         name TEXT NOT NULL,
-        password_hash TEXT NOT NULL,
+        password_hash TEXT,
         role TEXT NOT NULL DEFAULT 'admin' CHECK (role IN ('admin', 'manager', 'viewer')),
+        auth_provider TEXT NOT NULL DEFAULT 'local' CHECK (auth_provider IN ('local', 'ldap', 'oidc', 'oauth2', 'saml')),
+        auth_provider_id TEXT,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
+
+    // Add columns if upgrading from older schema
+    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_provider TEXT NOT NULL DEFAULT 'local'`);
+    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_provider_id TEXT`);
+    await client.query(`ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL`);
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS maintenance (

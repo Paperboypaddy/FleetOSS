@@ -1,4 +1,5 @@
 import type { PanelId } from '../../types';
+import { SunIcon, MoonIcon } from '../ui/Icons';
 
 const labels: Record<PanelId, string> = {
   map: 'Live View',
@@ -11,9 +12,11 @@ const labels: Record<PanelId, string> = {
 interface TopbarProps {
   activePanel: PanelId;
   deviceCount: number;
+  theme: 'dark' | 'light';
+  onToggleTheme: () => void;
 }
 
-export default function Topbar({ activePanel, deviceCount }: TopbarProps) {
+export default function Topbar({ activePanel, deviceCount, theme, onToggleTheme }: TopbarProps) {
   return (
     <div className="h-13 bg-surface border-b border-border flex items-center px-4 gap-3 shrink-0">
       {(() => {
@@ -33,6 +36,13 @@ export default function Topbar({ activePanel, deviceCount }: TopbarProps) {
         </button>
       </div>
       <div className="ml-auto flex items-center gap-2">
+        <button
+          onClick={onToggleTheme}
+          className="w-7 h-7 rounded-lg border-none bg-surface-2 text-text-muted hover:text-text cursor-pointer flex items-center justify-center transition-colors text-sm"
+          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        >
+          {theme === 'dark' ? <SunIcon className="w-4 h-4" /> : <MoonIcon className="w-4 h-4" />}
+        </button>
         <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-dim border border-[rgba(16,185,129,0.25)] font-mono text-xs text-green">
           <div className="w-[7px] h-[7px] rounded-full bg-green animate-[pulse-glow_2s_ease-in-out_infinite]" />
           {deviceCount} Active

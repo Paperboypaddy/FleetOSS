@@ -14,7 +14,7 @@ interface Device {
   plate?: string | null
 }
 
-type SettingsTab = 'general' | 'users' | 'devices'
+type SettingsTab = 'general' | 'users' | 'devices' | 'personal'
 
 function authFetch(path: string, options: RequestInit = {}) {
   const headers: Record<string, string> = { ...(options.headers as Record<string, string> || {}) }
@@ -23,7 +23,15 @@ function authFetch(path: string, options: RequestInit = {}) {
   return fetch(path, { ...options, headers })
 }
 
-export default function SettingsPanel({ showToast }: { showToast: (msg: string) => void }) {
+const THEMES = [
+  { id: 'default', label: 'Cyan', dark: '#00D4FF', light: '#0284C7' },
+  { id: 'emerald', label: 'Emerald', dark: '#10B981', light: '#059669' },
+  { id: 'violet', label: 'Violet', dark: '#8B5CF6', light: '#7C3AED' },
+  { id: 'rose', label: 'Rose', dark: '#F43F5E', light: '#E11D48' },
+  { id: 'amber', label: 'Amber', dark: '#F59E0B', light: '#D97706' },
+]
+
+export default function SettingsPanel({ showToast, colorTheme, onColorThemeChange }: { showToast: (msg: string) => void; colorTheme: string; onColorThemeChange: (t: string) => void }) {
   const [tab, setTab] = useState<SettingsTab>('general')
   const [stats, setStats] = useState<ServerStats | null>(null)
   const [users, setUsers] = useState<User[]>([])
@@ -131,6 +139,7 @@ export default function SettingsPanel({ showToast }: { showToast: (msg: string) 
 
   const tabs: { id: SettingsTab; label: string }[] = [
     { id: 'general', label: 'General' },
+    { id: 'personal', label: 'Personal' },
     { id: 'users', label: 'Users' },
     { id: 'devices', label: 'Devices' },
   ]
@@ -266,6 +275,39 @@ export default function SettingsPanel({ showToast }: { showToast: (msg: string) 
                 </div>
               </>
             ) : <p className="text-text-muted text-sm">Loading...</p>}
+          </div>
+        )}
+
+        {tab === 'personal' && (
+          <div className="p-6">
+            <h1 className="text-lg font-semibold mb-1">Personal</h1>
+            <p className="text-xs text-text-muted mb-6">Account preferences and appearance</p>
+
+            <div className="bg-surface border border-border rounded-lg p-4">
+              <h2 className="text-sm font-semibold mb-3">Color Theme</h2>
+              <div className="flex flex-wrap gap-3">
+                {THEMES.map(t => {
+                  const active = colorTheme === t.id
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => onColorThemeChange(t.id)}
+                      className={`relative flex flex-col items-center gap-2 p-3 rounded-lg border-2 cursor-pointer transition-all min-w-[90px] ${
+                        active
+                          ? 'border-cyan bg-cyan-dim'
+                          : 'border-border bg-surface-2 hover:border-text-muted'
+                      }`}
+                    >
+                      <div className="flex gap-1">
+                        <div className="w-6 h-6 rounded-full" style={{ backgroundColor: t.dark }} />
+                        <div className="w-6 h-6 rounded-full" style={{ backgroundColor: t.light }} />
+                      </div>
+                      <span className={`text-xs font-medium ${active ? 'text-cyan' : 'text-text-dim'}`}>{t.label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
           </div>
         )}
 

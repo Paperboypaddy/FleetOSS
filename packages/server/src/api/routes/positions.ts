@@ -23,7 +23,7 @@ export function registerPositionRoutes(app: FastifyInstance) {
 
       const results = await getPositions(deviceId, fromDate, toDate, maxResults);
       return reply.send(results);
-    } catch (err: any) {
+    } catch (err: unknown) {
       request.log.error(err, 'Failed to fetch positions');
       return reply.code(500).send({ error: 'Internal server error' });
     }

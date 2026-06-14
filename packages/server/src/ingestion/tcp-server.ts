@@ -24,7 +24,7 @@ export function startTcpServer(port: number, label: string, handler: TcpHandler)
     console.log(`${label} TCP server listening on port ${port}`);
   });
 
-  server.on('error', (err: any) => {
+  server.on('error', (err: Error) => {
     console.error(`${label} server error on port ${port}: ${err.message}`);
   });
 

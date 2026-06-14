@@ -15,7 +15,10 @@
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
-    "jsonwebtoken": "^9.0.3"
+    "jsonwebtoken": "^9.0.3",
+    "ldapjs": "^3.0.7",
+    "openid-client": "^6.8.4",
+    "samlify": "^2.13.1"
   },
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.10"

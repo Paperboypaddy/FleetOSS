@@ -1,0 +1,33 @@
+import type { FastifyRequest, FastifyReply } from 'fastify';
+import jwt from 'jsonwebtoken';
+import { config } from '../config/index.js';
+
+declare module 'fastify' {
+  interface FastifyRequest {
+    user?: { sub: string; email: string; role: string; authProvider: string };
+  }
+}
+
+export function signToken(userId: string, email: string, role: string): string {
+  return jwt.sign({ sub: userId, email, role }, config.jwtSecret, { expiresIn: config.jwtExpiresIn || '7d' });
+}
+
+export function verifyToken(token: string): { sub: string; email: string; role: string } | null {
+  try {
+    return jwt.verify(token, config.jwtSecret) as { sub: string; email: string; role: string };
+  } catch {
+    return null;
+  }
+}
+
+export async function authMiddleware(request: FastifyRequest, reply: FastifyReply) {
+  const auth = request.headers.authorization;
+  if (!auth?.startsWith('Bearer ')) {
+    return reply.code(401).send({ error: 'Unauthorized' });
+  }
+  const payload = verifyToken(auth.slice(7));
+  if (!payload) {
+    return reply.code(401).send({ error: 'Invalid or expired token' });
+  }
+  request.user = payload;
+}

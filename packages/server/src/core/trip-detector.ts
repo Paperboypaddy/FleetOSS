@@ -23,8 +23,8 @@ export async function detectTrip(deviceId: string, position: Position) {
   // Check if this device has trip detection disabled
   const db = getDb();
   const devResult = await db.select({ attributes: devices.attributes }).from(devices).where(eq(devices.id, deviceId)).limit(1);
-  const devAttrs = (devResult[0]?.attributes || {}) as Record<string, any>;
-  if (devAttrs.skipTripDetection === true) return;
+  const devAttrs = (devResult[0]?.attributes || {}) as Record<string, unknown>;
+  if (devAttrs['skipTripDetection'] === true) return;
 
   let state = deviceState.get(deviceId);
   const speed = position.speed || 0;

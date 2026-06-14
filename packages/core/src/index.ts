@@ -165,11 +165,29 @@ export interface User {
   email: string;
   name: string;
   role: UserRole;
+  authProvider: AuthProvider;
+  authProviderId?: string;
   attributes: Record<string, unknown>;
   createdAt: string;
 }
 
 export type UserRole = 'admin' | 'manager' | 'viewer';
+
+export type AuthProvider = 'local' | 'ldap' | 'oidc' | 'oauth2' | 'saml';
+
+export interface AuthProviderInfo {
+  id: AuthProvider;
+  name: string;
+  type: 'form' | 'redirect';
+  loginUrl?: string;
+}
+
+export interface AuthConfig {
+  jwtSecret: string;
+  jwtExpiresIn: string;
+  sessionSecret: string;
+  providers: Record<string, { enabled: boolean } & Record<string, unknown>>;
+}
 
 // ── WebSocket Events ──
 export type WsEvent =

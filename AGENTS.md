@@ -8,11 +8,13 @@ Open Source Fleet & Asset Intelligence Platform — a self-hostable Traccar alte
 
 ### Current Priorities
 <!-- List active priorities here, newest first -->
+- [x] Color themes (Emerald, Violet, Rose, Amber) + Personal tab in Settings with theme picker
+- [x] Dark/light theme toggle (sun/moon icon in Topbar), light mode CSS variables, persisted to localStorage
 - [x] Device approval flow: new GPS devices created as unapproved, admin adds them via Settings → Devices
+- [x] Custom site name and logo upload in General settings
 - [x] JWT Authentication — login/register page, protected routes, 7-day tokens
 - [x] Settings/Admin panel — sidebar nav, user management (create/list/delete), device config
 - [x] Device-level trip detection toggle (`skipTripDetection` attribute honored by trip detector)
-- [x] Custom site name and logo upload in General settings
 - [x] Collapsible asset sidebar for mobile
 - [x] Trip playback with green moving marker + trail
 - [x] Real GPS speed readings in playback (not synthetic curve)
@@ -24,6 +26,9 @@ Open Source Fleet & Asset Intelligence Platform — a self-hostable Traccar alte
 
 ### Agent Change Log
 <!-- Agents log their changes here with date/description -->
+- 2026-06-14 — Fix TypeScript strict mode: eliminated all `any` types across server codebase
+- 2026-06-14 — Color themes (Emerald, Violet, Rose, Amber) + Personal tab in Settings with theme picker
+- 2026-06-14 — Dark/light theme toggle (sun/moon icon in Topbar), light mode CSS variables, persisted to localStorage
 - 2026-06-14 — Device approval flow: `approved` column/flag, unapproved devices hidden from map, Settings → Devices shows "Devices Awaiting Approval" with Add button
 - 2026-06-14 — Geofences/Events/Maintenance/Fuel CRUD APIs + real frontend panels
 - 2026-06-14 — TK103 + Teltonika Codec 8 protocol parsers on ports 5002, 5056
@@ -70,7 +75,7 @@ fleetoss/
 - `src/components/trips/` — TripsPanel.tsx (filterable table + editable type/purpose + geocoded addresses)
 - `src/components/maint/` — MaintPanel.tsx (placeholder — coming soon)
 - `src/components/fuel/` — FuelPanel.tsx (placeholder — coming soon)
-- `src/components/settings/` — SettingsPanel.tsx (sidebar nav: General, Users, Devices)
+- `src/components/settings/` — SettingsPanel.tsx (sidebar nav: General, Personal, Users, Devices)
 - `src/components/ui/` — Icons.tsx (SVG components), Toast.tsx
 
 **Key patterns:**
@@ -210,10 +215,11 @@ Frontend has its own types in `app/src/types/index.ts` (older/separate — consi
 
 ### 3. Frontend polish
 - [x] Fuel/Maint panels wired to real data
-- [ ] Dark/light theme toggle
+- [x] Dark/light theme toggle
+- [x] Color themes (Emerald, Violet, Rose, Amber) + Personal tab in Settings
 
 ### 4. Server polish
-- [ ] Fix TypeScript strict mode issues (implicit any, etc.)
+- [x] Fix TypeScript strict mode issues (implicit any, etc.)
 - [ ] Add error handling middleware
 - [ ] Add request logging / request IDs
 - [ ] Add pagination to list endpoints

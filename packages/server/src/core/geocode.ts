@@ -6,7 +6,7 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string |
       signal: AbortSignal.timeout(3000),
     })
     if (!res.ok) return null
-    const data = await res.json() as any
+    const data = await res.json() as { address?: Record<string, string>; display_name?: string }
     if (!data?.address) return null
     const a = data.address
     const street = [a.house_number, a.road, a.pedestrian].filter(Boolean).join(' ')

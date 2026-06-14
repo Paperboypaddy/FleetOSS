@@ -79,8 +79,10 @@ export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
   email: text('email').notNull().unique(),
   name: text('name').notNull(),
-  passwordHash: text('password_hash').notNull(),
+  passwordHash: text('password_hash'),
   role: text('role', { enum: ['admin', 'manager', 'viewer'] }).default('admin').notNull(),
+  authProvider: text('auth_provider', { enum: ['local', 'ldap', 'oidc', 'oauth2', 'saml'] }).default('local').notNull(),
+  authProviderId: text('auth_provider_id'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 

@@ -32,7 +32,7 @@ export function registerStatsRoutes(app: FastifyInstance) {
       } finally {
         client.release();
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       request.log.error(err, 'Failed to fetch stats');
       return reply.code(500).send({ error: 'Internal server error' });
     }

@@ -15,7 +15,7 @@ export function registerEventRoutes(app: FastifyInstance) {
         .where(conditions.length ? and(...conditions) : undefined)
         .orderBy(desc(events.time)).limit(max);
       return reply.send(result);
-    } catch (err: any) {
+    } catch (err: unknown) {
       request.log.error(err, 'Failed to fetch events');
       return reply.code(500).send({ error: 'Internal server error' });
     }
