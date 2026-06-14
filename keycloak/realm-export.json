@@ -1,0 +1,157 @@
+{
+  "id": "fleetoss",
+  "realm": "fleetoss",
+  "displayName": "FleetOSS",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "users": [
+    {
+      "username": "admin",
+      "email": "admin@fleetoss.local",
+      "firstName": "Admin",
+      "lastName": "User",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["user"]
+    },
+    {
+      "username": "alice",
+      "email": "alice@fleetoss.local",
+      "firstName": "Alice",
+      "lastName": "Johnson",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["user"]
+    },
+    {
+      "username": "bob",
+      "email": "bob@fleetoss.local",
+      "firstName": "Bob",
+      "lastName": "Smith",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["user"]
+    }
+  ],
+  "roles": {
+    "realm": [
+      {
+        "name": "user",
+        "description": "Regular user"
+      },
+      {
+        "name": "admin",
+        "description": "Administrator"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "fleetoss-oidc",
+      "name": "FleetOSS OIDC",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "fleetoss-oidc-client-secret",
+      "redirectUris": ["http://localhost:4000/api/auth/*", "http://localhost:5173/*"],
+      "webOrigins": ["http://localhost:4000", "http://localhost:5173"],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "clientAuthenticatorType": "client-secret",
+      "attributes": {
+        "post.logout.redirect.uris": "http://localhost:5173/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "email",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-property-mapper",
+          "config": {
+            "user.attribute": "email",
+            "claim.name": "email",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "name",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-property-mapper",
+          "config": {
+            "user.attribute": "firstName",
+            "claim.name": "name",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "fleetoss-saml",
+      "name": "FleetOSS SAML",
+      "enabled": true,
+      "protocol": "saml",
+      "clientAuthenticatorType": "client-secret",
+      "attributes": {
+        "saml.authnstatement": "true",
+        "saml.assertion.signature": "false",
+        "saml.client.signature": "false",
+        "saml.force.post.binding": "true",
+        "saml.server.signature": "false",
+        "saml.signature.algorithm": "RSA_SHA256",
+        "saml_assertion_consumer_url_post": "http://localhost:4000/api/auth/saml/callback",
+        "saml_single_logout_service_url_post": "http://localhost:4000/api/auth/saml/callback",
+        "post.logout.redirect.uris": "http://localhost:5173/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "email",
+          "protocol": "saml",
+          "protocolMapper": "saml-user-property-mapper",
+          "config": {
+            "attribute.name": "mail",
+            "attribute.nameformat": "Basic",
+            "user.attribute": "email"
+          }
+        },
+        {
+          "name": "name",
+          "protocol": "saml",
+          "protocolMapper": "saml-user-property-mapper",
+          "config": {
+            "attribute.name": "cn",
+            "attribute.nameformat": "Basic",
+            "user.attribute": "firstName"
+          }
+        }
+      ]
+    }
+  ],
+  "identityProviders": []
+}

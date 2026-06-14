@@ -1,109 +1,82 @@
-import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-
-declare module 'fastify' {
-  interface FastifyRequest {
-    user?: { sub: string; email: string; role: string };
-  }
-}
-import { eq } from 'drizzle-orm';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import type { FastifyInstance } from 'fastify';
+import type { AuthStrategy } from './strategies/strategy.js';
+import { localStrategy } from './strategies/local.js';
+import { ldapStrategy } from './strategies/ldap.js';
+import { oidcStrategy } from './strategies/oidc.js';
+import { oauth2Strategy } from './strategies/oauth2.js';
+import { samlStrategy } from './strategies/saml.js';
 import { getDb } from '../db/connection.js';
-import { users } from '../db/schema.js';
-import { config } from '../config/index.js';
+import { authProviders } from '../db/schema.js';
+import { signToken } from './utils.js';
+import { registerDbProviderRoutes } from './db-router.js';
 
-const SALT_ROUNDS = 10;
+const envStrategies: AuthStrategy[] = [
+  localStrategy,
+  ldapStrategy,
+  oidcStrategy,
+  oauth2Strategy,
+  samlStrategy,
+];
 
-export function signToken(userId: string, email: string, role: string): string {
-  return jwt.sign({ sub: userId, email, role }, config.jwtSecret, { expiresIn: '7d' });
-}
-
-export function verifyToken(token: string): { sub: string; email: string; role: string } | null {
+async function getDbProviders() {
   try {
-    return jwt.verify(token, config.jwtSecret) as { sub: string; email: string; role: string };
+    const db = getDb();
+    return await db.select().from(authProviders).orderBy(authProviders.createdAt);
   } catch {
-    return null;
+    return [];
   }
 }
 
-export async function registerUser(email: string, name: string, password: string) {
-  const db = getDb();
-  const hash = await bcrypt.hash(password, SALT_ROUNDS);
-  const result = await db.insert(users).values({ email, name, passwordHash: hash }).returning();
-  return result[0];
+export async function getEnabledProviders() {
+  const envProviders = envStrategies
+    .filter(s => s.enabled)
+    .map(s => ({
+      id: s.id,
+      name: s.name,
+      type: s.type,
+      loginUrl: s.loginUrl,
+    }));
+
+  const dbProviders = await getDbProviders();
+  const dbActive = dbProviders
+    .filter(p => p.enabled)
+    .map(p => ({
+      id: p.id,
+      name: p.name,
+      type: p.providerType === 'ldap' ? 'form' as const : 'redirect' as const,
+      loginUrl: p.providerType !== 'ldap' ? `/api/auth/db/${p.id}/login` : undefined,
+    }));
+
+  return [...envProviders, ...dbActive];
 }
 
-export async function authenticateUser(email: string, password: string) {
-  const db = getDb();
-  const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
-  if (result.length === 0) return null;
-  const user = result[0];
-  const valid = await bcrypt.compare(password, user.passwordHash);
-  if (!valid) return null;
-  return user;
-}
-
-export async function authMiddleware(request: FastifyRequest, reply: FastifyReply) {
-  const auth = request.headers.authorization;
-  if (!auth?.startsWith('Bearer ')) {
-    return reply.code(401).send({ error: 'Unauthorized' });
-  }
-  const payload = verifyToken(auth.slice(7));
-  if (!payload) {
-    return reply.code(401).send({ error: 'Invalid or expired token' });
-  }
-  request.user = payload;
+export function getStrategy(id: string): AuthStrategy | undefined {
+  return envStrategies.find(s => s.id === id);
 }
 
 export function registerAuthRoutes(app: FastifyInstance) {
-  // Register first admin user (only works if no users exist yet)
-  app.post<{ Body: { email?: string; name?: string; password?: string } }>('/api/auth/register', async (request, reply) => {
-    try {
-      const db = getDb();
-      const existing = await db.select().from(users).limit(1);
-      if (existing.length > 0) {
-        return reply.code(403).send({ error: 'Setup already completed' });
-      }
+  // Provider list endpoint (public)
+  app.get('/api/auth/providers', async () => {
+    return getEnabledProviders();
+  });
 
-      const { email, name, password } = request.body;
-      if (!email || !name || !password || password.length < 6) {
-        return reply.code(400).send({ error: 'Email, name, and password (6+ chars) required' });
-      }
-
-      const user = await registerUser(email, name, password);
-      const token = signToken(user.id as string, email, 'admin');
-      return reply.send({ token, user: { id: user.id, email, name, role: 'admin' } });
-    } catch (err: unknown) {
-      if (err instanceof Error && 'code' in err && (err as Record<string, unknown>).code === '23505') return reply.code(409).send({ error: 'Email already exists' });
-      request.log.error(err, 'Registration failed');
-      return reply.code(500).send({ error: 'Internal server error' });
+  // Register env-strategy routes
+  for (const strategy of envStrategies) {
+    if (strategy.enabled && strategy.registerRoutes) {
+      strategy.registerRoutes(app);
     }
-  });
-
-  // Login
-  app.post<{ Body: { email?: string; password?: string } }>('/api/auth/login', async (request, reply) => {
-    try {
-      const { email, password } = request.body;
-      if (!email || !password) {
-        return reply.code(400).send({ error: 'Email and password required' });
-      }
-
-      const user = await authenticateUser(email, password);
-      if (!user) {
-        return reply.code(401).send({ error: 'Invalid email or password' });
-      }
-
-      const token = signToken(user.id, user.email, user.role);
-      return reply.send({ token, user: { id: user.id, email: user.email, name: user.name, role: user.role } });
-    } catch (err: unknown) {
-      request.log.error(err, 'Login failed');
-      return reply.code(500).send({ error: 'Internal server error' });
-    }
-  });
-
-  // Verify token / get current user
-  app.get('/api/auth/me', { preHandler: authMiddleware }, async (request, reply) => {
-    const user = request.user;
-    return reply.send({ user });
-  });
+  }
 }
+
+// Called after DB providers are loaded at startup
+export async function registerDbAuthRoutes(app: FastifyInstance) {
+  const providers = await getDbProviders();
+  for (const p of providers) {
+    if (p.enabled) {
+      registerDbProviderRoutes(app, p);
+    }
+  }
+}
+
+// Re-export utilities for use by other modules
+export { signToken, verifyToken, authMiddleware } from './utils.js';

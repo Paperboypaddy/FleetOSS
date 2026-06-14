@@ -8,6 +8,7 @@ Open Source Fleet & Asset Intelligence Platform — a self-hostable Traccar alte
 
 ### Current Priorities
 <!-- List active priorities here, newest first -->
+- [x] Redis integration: persistent trip detection, async geocode queue, WebSocket fan-out, rate limiting
 - [x] Color themes (Emerald, Violet, Rose, Amber) + Personal tab in Settings with theme picker
 - [x] Dark/light theme toggle (sun/moon icon in Topbar), light mode CSS variables, persisted to localStorage
 - [x] Device approval flow: new GPS devices created as unapproved, admin adds them via Settings → Devices
@@ -26,6 +27,7 @@ Open Source Fleet & Asset Intelligence Platform — a self-hostable Traccar alte
 
 ### Agent Change Log
 <!-- Agents log their changes here with date/description -->
+- 2026-06-14 — Redis integration: persistent trip detection, async geocode queue, WebSocket fan-out, rate limiting
 - 2026-06-14 — Error handling middleware (AppError class + global error handler), removed redundant try/catch from all routes
 - 2026-06-14 — Fix TypeScript strict mode: eliminated all `any` types across server codebase
 - 2026-06-14 — Color themes (Emerald, Violet, Rose, Amber) + Personal tab in Settings with theme picker
@@ -42,6 +44,8 @@ Open Source Fleet & Asset Intelligence Platform — a self-hostable Traccar alte
 - 2026-06-14 — Fix trip detector: in-memory state, 5-min stop gap, backfill script
 - 2026-06-14 — Raw GPS trace on map (skip OSRM), real speed readings in playback
 - 2026-06-14 — Background Geolocation format parser, m/s → mph conversion
+- 2026-06-14 — SSO settings panel (frontend CRUD UI for LDAP/OIDC/OAuth2/SAML provider config)
+- 2026-06-14 — Pluggable auth system: LDAP, OIDC, OAuth2, SAML strategies + Keycloak + SSO login page
 - 2026-06-14 — Initialized agent coordination section in AGENTS.md
 
 ## Architecture
@@ -76,7 +80,7 @@ fleetoss/
 - `src/components/trips/` — TripsPanel.tsx (filterable table + editable type/purpose + geocoded addresses)
 - `src/components/maint/` — MaintPanel.tsx (placeholder — coming soon)
 - `src/components/fuel/` — FuelPanel.tsx (placeholder — coming soon)
-- `src/components/settings/` — SettingsPanel.tsx (sidebar nav: General, Personal, Users, Devices)
+- `src/components/settings/` — SettingsPanel.tsx (sidebar nav: General, Personal, Users, Devices, SSO), SsoSettings.tsx (SSO provider CRUD)
 - `src/components/ui/` — Icons.tsx (SVG components), Toast.tsx
 
 **Key patterns:**
@@ -98,7 +102,10 @@ fleetoss/
 **Structure:**
 - `src/index.ts` — Entry point: Fastify server with CORS, WebSocket, health check, dual-port (4000 + 5055)
 - `src/config/index.ts` — Environment config (PORT, DATABASE_URL, JWT_SECRET, S3, Redis)
-- `src/auth/index.ts` — JWT sign/verify, register/login, authMiddleware for protected routes
+- `src/auth/index.ts` — Strategy registry, JWT sign/verify, authMiddleware, route registration
+- `src/auth/strategies/` — LDAP, OIDC, OAuth2, SAML strategy implementations
+- `src/auth/db-router.ts` — Dynamic route registration for DB-backed auth providers
+- `src/api/routes/auth-providers.ts` — CRUD API for SSO provider config
 - `src/db/`
   - `connection.ts` — Drizzle + pg Pool singleton
   - `schema.ts` — Drizzle table definitions (devices, positions, trips, geofences, events, users)
@@ -118,8 +125,12 @@ fleetoss/
 - `src/api/routes/users.ts` — `GET /api/users`, `POST /api/users`, `DELETE /api/users/:id` (admin-only)
 - `src/api/routes/stats.ts` — `GET /api/stats` (device/position/trip counts, protocol breakdown)
 - `src/realtime/index.ts` — WebSocket at `/ws`, broadcasts positions to connected clients
-- `src/core/trip-detector.ts` — Speed-based trip start/end detection (in-memory state per device, 5-min stop threshold, respects skipTripDetection)
+- `src/core/trip-detector.ts` — Speed-based trip start/end detection (Redis-backed state with in-memory fallback, 5-min stop threshold, respects skipTripDetection)
 - `src/core/geocode.ts` — Server-side Nominatim reverse geocoding
+- `src/core/geocoder.ts` — Async geocode job queue (Redis list)
+- `src/core/geocoder-worker.ts` — Background worker polling Redis queue, rate-limited Nominatim calls with retries
+- `src/core/rate-limiter.ts` — Sliding window rate limiter (Redis sorted sets)
+- `src/db/redis.ts` — Redis connection singleton (lazy connect, graceful fallback)
 
 **Dev server:** `npm run dev -w packages/server` or `npm run dev` from root → http://localhost:4000
 **Traccar-compatible port:** Also listens on :5055 for Traccar Client apps
@@ -143,7 +154,7 @@ Frontend has its own types in `app/src/types/index.ts` (older/separate — consi
 1. **Monorepo with npm workspaces** — shared types between frontend and backend, single `npm install`
 2. **Pluggable protocol ingestion** — each GPS protocol is a file exporting `parse(buffer): IngestedPosition`
 3. **Pluggable storage** — Repository pattern, S3 abstraction via MinIO SDK
-4. **Pluggable auth** — Strategy pattern, start with JWT, add OAuth2/OIDC later
+4. **Pluggable auth** — Strategy pattern: local (default) + env-var LDAP/OIDC/OAuth2/SAML + DB-backed providers configurable via Settings → SSO panel
 5. **Database** — PostgreSQL + PostGIS with raw SQL migrations (not Drizzle Kit) for control; Drizzle ORM for queries
 6. **Multi-tenancy ready** — Schema-per-tenant from the start
 7. **Async processing** — Trip detection, geofencing, alerts go through in-memory queue (future: RabbitMQ/Kafka)
@@ -163,6 +174,7 @@ Frontend has its own types in `app/src/types/index.ts` (older/separate — consi
 - [x] Frontend: Battery level display, last seen timestamps
 - [x] Frontend: Editable trip type (None/Work/Personal) and purpose
 - [x] Frontend: Auto-geocoded trip addresses from Nominatim
+- [x] Frontend: SSO settings panel (CRUD UI for LDAP/OIDC/OAuth2/SAML provider config)
 - [x] Frontend: Settings/Admin panel with sidebar (General, Users, Devices tabs)
 - [x] Frontend: User management (create with role, list, delete)
 - [x] Frontend: Device settings with trip detection toggle
@@ -172,6 +184,8 @@ Frontend has its own types in `app/src/types/index.ts` (older/separate — consi
 - [x] Frontend: Active panel persisted to localStorage across reloads
 - [x] Core: Shared TypeScript types (Device, Position, Trip, Geofence, Event, etc.)
 - [x] Server: Fastify scaffold with CORS, WebSocket, health check
+- [x] Server: Pluggable auth — LDAP, OIDC, OAuth2, SAML strategies + dynamic DB-backed providers
+- [x] Server: Auth provider CRUD API (GET/POST/PATCH/DELETE /api/settings/auth-providers)
 - [x] Server: JWT auth — register (first-run), login, /api/auth/me
 - [x] Server: User management API (list, create, delete users)
 - [x] Server: Database schema + migrations (devices, positions, trips, geofences, events, users)
@@ -194,7 +208,7 @@ Frontend has its own types in `app/src/types/index.ts` (older/separate — consi
 - [x] Server: TK103 protocol parser + TCP server on port 5002
 - [x] Server: Teltonika Codec 8/8E protocol parser + TCP server on port 5056
 - [x] Server: Queclink protocol parser + TCP server on port 5004
-- [x] Infrastructure: Docker Compose (PostGIS, MinIO, Redis)
+- [x] Infrastructure: Docker Compose (PostGIS, MinIO, Redis, Keycloak)
 - [x] Infrastructure: .gitignore (node_modules, dist, .env, *.log)
 
 ## Next Steps (Priority Order)
@@ -222,6 +236,7 @@ Frontend has its own types in `app/src/types/index.ts` (older/separate — consi
 ### 4. Server polish
 - [x] Fix TypeScript strict mode issues (implicit any, etc.)
 - [x] Add error handling middleware
+- [x] Pluggable auth system (LDAP, OIDC, OAuth2, SAML) + SSO settings panel
 - [ ] Add request logging / request IDs
 - [ ] Add pagination to list endpoints
 
@@ -236,7 +251,15 @@ Frontend has its own types in `app/src/types/index.ts` (older/separate — consi
 - [ ] Add CI/CD pipeline
 - [ ] Add Helm chart for Kubernetes deployment
 
-### 7. Multi-Tenant (branch: `multi-tenant`)
+### 7. Redis Integration
+
+- [x] Redis connection singleton (lazy connect, graceful fallback to in-memory)
+- [x] Persistent trip detection (Redis hashes + TTL, fallback to in-memory Map)
+- [x] Async geocode queue (Redis list + BLPOP worker, Nominatim rate limit, retries)
+- [x] WebSocket fan-out (Redis Pub/Sub for multi-instance position broadcasting)
+- [x] Rate limiting (sliding window per-IP on ingestion endpoints, 60 req/min)
+
+### 8. Multi-Tenant (branch: `multi-tenant`)
 
 **Architecture:** Schema-per-tenant — each customer gets an isolated PostgreSQL schema.
 

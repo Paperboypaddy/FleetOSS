@@ -65,4 +65,11 @@ Authentication uses a strategy pattern. Start with JWT bearer tokens. Add OAuth2
 The database uses schema-per-tenant isolation from day one. Each tenant gets their own PostgreSQL schema (`tenant_xxx`), making horizontal sharding and data separation straightforward.
 
 ### 6. Async Processing
-Trip detection, geofence evaluation, and alert generation run through an in-memory async queue so ingestion stays fast. Future: replace with RabbitMQ or Kafka for distributed processing.
+Trip detection, geofence evaluation, and alert generation run through an in-memory async queue so ingestion stays fast. Geocoding jobs are pushed to a Redis list and processed by a background worker with rate limiting and retries. Future: replace with RabbitMQ or Kafka for full distributed processing.
+
+### 7. Redis Integration
+Redis is optional (graceful fallback) and used for four purposes:
+- **Persistent trip detection** — `DeviceTripState` stored in Redis hashes with 24h TTL, survives server restarts
+- **Async geocode queue** — Jobs pushed to a Redis list, worker polls with `BLPOP`, respects Nominatim's 1 req/sec limit, retries up to 3 times
+- **WebSocket fan-out** — Positions published to a Redis channel, all server instances receive and forward to local WebSocket clients (enables horizontal scaling)
+- **Rate limiting** — Sliding window per-IP using Redis sorted sets (60 req/min on ingestion endpoints)

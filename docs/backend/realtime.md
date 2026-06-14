@@ -61,19 +61,24 @@ Sent whenever a new GPS position is ingested:
 Position ingested via POST /api/ingest
         │
         ▼
-Stored in PostgreSQL
-        │
-        ▼
 broadcastPosition(position)
         │
-        ▼
-Iterates all connected WebSocket clients
+        ├──────────────────┬──────────────────┐
+        ▼                  ▼                  ▼
+Local WebSocket       Redis Pub/Sub      Geocode queue
+clients (same         channel            (Redis list →
+process)              "positions"        BLPOP worker)
+        │                  │
+        │                  ▼
+        │           Other server instances
+        │           (subscribe → forward
+        │            to their local WS clients)
         │
-        ├─ Checks if client has deviceFilter
-        │     ├─ No filter → send to all
-        │     └─ Has filter → only send if deviceId matches
-        ├─ Checks readyState === 1 (OPEN)
-        └─ Sends JSON message
+        ▼
+For each connected WS client:
+  ├─ Has deviceFilter? Skip if deviceId not in filter
+  ├─ readyState === 1 (OPEN)? Skip if not
+  └─ Send JSON message
 ```
 
 ## Frontend Integration (Planned)

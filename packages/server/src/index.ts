@@ -6,15 +6,19 @@ import { registerIngestionRoutes, handleTraccarIngest } from './ingestion/server
 import { registerDeviceRoutes } from './api/routes/devices.js';
 import { registerPositionRoutes } from './api/routes/positions.js';
 import { registerTripRoutes } from './api/routes/trips.js';
-import { registerAuthRoutes } from './auth/index.js';
+import { registerAuthRoutes, registerDbAuthRoutes } from './auth/index.js';
 import { registerUserRoutes } from './api/routes/users.js';
 import { registerGeofenceRoutes } from './api/routes/geofences.js';
 import { registerEventRoutes } from './api/routes/events.js';
 import { registerMaintenanceRoutes } from './api/routes/maintenance.js';
 import { registerFuelRoutes } from './api/routes/fuel.js';
+import { registerAuthProviderRoutes } from './api/routes/auth-providers.js';
 import { registerSpeedLimitRoutes } from './api/routes/speedlimits.js';
 import { registerStatsRoutes } from './api/routes/stats.js';
+import { registerErrorHandler } from './api/errors.js';
 import { registerRealtime } from './realtime/index.js';
+import { startGeocoderWorker, stopGeocoderWorker } from './core/geocoder-worker.js';
+import { closeRedis } from './db/redis.js';
 import { startTcpServer } from './ingestion/tcp-server.js';
 import { nmeaHandler } from './ingestion/handlers/nmea-handler.js';
 import { gt06Handler } from './ingestion/handlers/gt06-handler.js';
@@ -45,7 +49,8 @@ async function main() {
   app.post('/', handleTraccarIngest);
 
   // Routes
-  registerAuthRoutes(app);
+  await registerAuthRoutes(app);
+  await registerDbAuthRoutes(app);
   registerIngestionRoutes(app);
   registerDeviceRoutes(app);
   registerPositionRoutes(app);
@@ -55,9 +60,24 @@ async function main() {
   registerEventRoutes(app);
   registerMaintenanceRoutes(app);
   registerFuelRoutes(app);
+  registerAuthProviderRoutes(app);
   registerSpeedLimitRoutes(app);
   registerStatsRoutes(app);
   registerRealtime(app);
+
+  // Error handling (must be registered after routes)
+  registerErrorHandler(app);
+
+  // Start background geocode worker
+  startGeocoderWorker();
+
+  // Shutdown handlers
+  const cleanup = async () => {
+    stopGeocoderWorker();
+    await closeRedis();
+  };
+  process.on('SIGTERM', cleanup);
+  process.on('SIGINT', cleanup);
 
   // Start on configured port (default 4000)
   try {

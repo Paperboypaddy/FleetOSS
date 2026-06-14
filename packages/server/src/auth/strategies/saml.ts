@@ -7,43 +7,36 @@ import { config } from '../../config/index.js';
 import { signToken } from '../utils.js';
 import { eq } from 'drizzle-orm';
 
-let sp: any = null;
-let idp: any = null;
+let spInstance: any = null;
+let idpInstance: any = null;
 
 function getSamlEntities() {
-  if (sp && idp) return { sp, idp };
+  if (spInstance && idpInstance) return { sp: spInstance, idp: idpInstance };
 
   const samlConfig = config.auth.saml;
   const callbackUrl = samlConfig.callbackUrl || `${config.baseUrl}/api/auth/saml/callback`;
 
-  idp = samlify.IdentityProvider({
-    metadata: !samlConfig.entryPoint.includes('metadata')
-      ? undefined
-      : undefined,
+  idpInstance = samlify.IdentityProvider({
     entityID: samlConfig.issuer,
-    singleSignOnService: [
-      {
-        Binding: 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect',
-        Location: samlConfig.entryPoint,
-      },
-    ],
+    singleSignOnService: [{
+      Binding: 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect',
+      Location: samlConfig.entryPoint,
+    }],
     signingCert: samlConfig.cert || undefined,
   });
 
-  sp = samlify.ServiceProvider({
+  spInstance = samlify.ServiceProvider({
     entityID: samlConfig.issuer,
     authnRequestsSigned: false,
     wantAssertionsSigned: false,
-    wantMessageSigned: false,
-    assertionConsumerService: [
-      {
-        Binding: 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST',
-        Location: callbackUrl,
-      },
-    ],
+    assertionConsumerService: [{
+      Binding: 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST',
+      Location: callbackUrl,
+    }],
+    privateKey: samlConfig.privateKey || undefined,
   });
 
-  return { sp, idp };
+  return { sp: spInstance, idp: idpInstance };
 }
 
 async function findOrCreateSamlUser(email: string, name: string, nameId: string) {
@@ -81,8 +74,8 @@ export const samlStrategy: AuthStrategy = {
 
     // SAML metadata endpoint
     app.get('/api/auth/saml/metadata', async (_request: FastifyRequest, reply: FastifyReply) => {
-      const { sp: spEntity } = getSamlEntities();
-      const metadata = spEntity.getMetadata();
+      const { sp } = getSamlEntities();
+      const metadata = sp.getMetadata();
       reply.header('Content-Type', 'application/xml');
       return reply.send(metadata);
     });
@@ -90,9 +83,9 @@ export const samlStrategy: AuthStrategy = {
     // Initiate SAML login
     app.get('/api/auth/saml/login', async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const { sp: spEntity, idp: idpEntity } = getSamlEntities();
-        const { context } = spEntity.createLoginRequest(idpEntity, 'redirect');
-        return reply.redirect(302, context);
+        const { sp, idp } = getSamlEntities();
+        const loginReq = sp.createLoginRequest(idp, 'redirect');
+        return reply.redirect(loginReq.context as any);
       } catch (err: any) {
         request.log.error(err, 'SAML login initiation failed');
         return reply.code(500).send({ error: 'Failed to initiate SAML login' });
@@ -102,22 +95,21 @@ export const samlStrategy: AuthStrategy = {
     // SAML ACS (Assertion Consumer Service)
     app.post('/api/auth/saml/callback', async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const { sp: spEntity, idp: idpEntity } = getSamlEntities();
-        const body = request.body as any;
+        const { sp, idp } = getSamlEntities();
+        const body = request.body as Record<string, unknown>;
 
-        // Parse the SAML response
-        const response = await spEntity.parseLoginResponse(idpEntity, 'post', {
-          body: body,
+        const response = await sp.parseLoginResponse(idp, 'post', {
+          body,
         });
 
-        const attributes = response.extract.attributes || {};
-        const nameId = response.extract.nameID || '';
+        const attributes = response.extract?.attributes || {};
+        const nameId = response.extract?.nameID || '';
 
         const emailAttr = config.auth.saml.emailAttribute || 'mail';
         const nameAttr = config.auth.saml.nameAttribute || 'cn';
 
-        const email = attributes[emailAttr]?.toString() || nameId;
-        const name = attributes[nameAttr]?.toString() || email?.split('@')[0] || 'User';
+        const email = (attributes[emailAttr]?.toString() || nameId || '') as string;
+        const name = (attributes[nameAttr]?.toString() || email?.split('@')[0] || 'User') as string;
 
         if (!email) {
           return reply.code(400).send({ error: 'Email not provided by identity provider' });
@@ -127,14 +119,16 @@ export const samlStrategy: AuthStrategy = {
         const token = signToken(user.id, user.email, user.role);
 
         const frontendUrl = config.baseUrl.replace(/:\d+$/, ':5173');
-        return reply.redirect(302, `${frontendUrl}/#/sso?token=${token}&user=${encodeURIComponent(JSON.stringify({
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-          authProvider: 'saml',
-          createdAt: user.createdAt,
-        }))}`);
+        return reply.redirect(
+          `${frontendUrl}/#/sso?token=${token}&user=${encodeURIComponent(JSON.stringify({
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            authProvider: 'saml',
+            createdAt: user.createdAt,
+          }))}` as any,
+        );
       } catch (err: any) {
         request.log.error(err, 'SAML callback failed');
         return reply.code(401).send({ error: 'SAML authentication failed' });

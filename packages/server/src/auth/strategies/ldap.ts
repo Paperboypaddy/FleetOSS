@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import ldap from 'ldapjs';
 import { getDb } from '../../db/connection.js';
 import { users } from '../../db/schema.js';
@@ -7,18 +7,38 @@ import { config } from '../../config/index.js';
 import { signToken } from '../utils.js';
 import { eq } from 'drizzle-orm';
 
+function ldapBindAsync(client: any, dn: string, password: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    client.bind(dn, password, (err: Error | null) => {
+      if (err) reject(new Error(`LDAP bind failed: ${err.message}`));
+      else resolve();
+    });
+  });
+}
+
+function ldapSearchAsync(client: any, base: string, opts: any): Promise<any[]> {
+  return new Promise((resolve, reject) => {
+    client.search(base, opts, (err: Error | null, searchRes: any) => {
+      if (err) { reject(new Error(`LDAP search failed: ${err.message}`)); return; }
+      const entries: any[] = [];
+      searchRes.on('searchEntry', (entry: any) => entries.push(entry));
+      searchRes.on('error', (searchErr: Error) => reject(new Error(`LDAP search error: ${searchErr.message}`)));
+      searchRes.on('end', () => resolve(entries));
+    });
+  });
+}
+
 async function findOrCreateLdapUser(email: string, displayName: string, ldapId: string) {
   const db = getDb();
   const existing = await db.select().from(users).where(eq(users.email, email)).limit(1);
   if (existing.length > 0) {
     const u = existing[0];
-    // Update provider info if user was local before
-    if (u.authProvider === 'local') {
+    if (u.authProvider !== 'ldap') {
       await db.update(users)
         .set({ authProvider: 'ldap', authProviderId: ldapId })
         .where(eq(users.id, u.id));
     }
-    return { ...u, authProvider: 'ldap' as const, authProviderId: ldapId };
+    return u;
   }
   const result = await db.insert(users).values({
     email,
@@ -31,6 +51,51 @@ async function findOrCreateLdapUser(email: string, displayName: string, ldapId: 
   return result[0];
 }
 
+async function authenticateLdap(email: string, password: string): Promise<any> {
+  const ldapConfig = config.auth.ldap;
+  const client = ldap.createClient({ url: ldapConfig.url });
+
+  try {
+    // Bind as service account first if configured
+    if (ldapConfig.bindDN && ldapConfig.bindPassword) {
+      await ldapBindAsync(client, ldapConfig.bindDN, ldapConfig.bindPassword);
+    }
+
+    let userDn: string;
+    let displayName: string;
+
+    if (ldapConfig.userDnTemplate) {
+      userDn = ldapConfig.userDnTemplate.replace('{{email}}', email);
+      await ldapBindAsync(client, userDn, password);
+      const nameMatch = userDn.match(/^CN=([^,]+)/i);
+      displayName = nameMatch ? nameMatch[1] : email.split('@')[0];
+    } else {
+      const searchFilter = ldapConfig.searchFilter.replace('{{email}}', email);
+      const entries = await ldapSearchAsync(client, ldapConfig.searchBase, {
+        filter: searchFilter,
+        scope: 'sub',
+        attributes: [ldapConfig.nameAttribute || 'cn', 'dn'],
+      });
+
+      if (entries.length === 0) {
+        throw new Error('User not found in LDAP');
+      }
+
+      userDn = entries[0].dn.toString();
+      displayName = entries[0].attributes?.find(
+        (a: any) => a.type === (ldapConfig.nameAttribute || 'cn')
+      )?.values?.[0] || email.split('@')[0];
+
+      // Bind as the user to verify password
+      await ldapBindAsync(client, userDn, password);
+    }
+
+    return await findOrCreateLdapUser(email, displayName, userDn);
+  } finally {
+    client.unbind();
+  }
+}
+
 export const ldapStrategy: AuthStrategy = {
   id: 'ldap',
   name: 'LDAP / Active Directory',
@@ -40,123 +105,25 @@ export const ldapStrategy: AuthStrategy = {
   registerRoutes(app: FastifyInstance) {
     if (!config.auth.ldap.enabled) return;
 
-    app.post('/api/auth/login/ldap', async (request: any, reply: any) => {
+    app.post('/api/auth/login/ldap', async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const { email, password } = request.body || {};
+        const { email, password } = request.body as { email?: string; password?: string };
         if (!email || !password) {
           return reply.code(400).send({ error: 'Email and password required' });
         }
 
-        const ldapConfig = config.auth.ldap;
-        const client = ldap.createClient({ url: ldapConfig.url });
-
-        await new Promise<void>((resolve, reject) => {
-          client.on('connectError', (err: Error) => reject(err));
-
-          // If we have a bind DN + password, bind as service account first to search
-          const doBind = ldapConfig.bindDN && ldapConfig.bindPassword
-            ? new Promise<void>((res, rej) => {
-                client.bind(ldapConfig.bindDN!, ldapConfig.bindPassword!, (err: Error | null) => {
-                  if (err) rej(new Error(`LDAP bind failed: ${err.message}`));
-                  else res();
-                });
-              })
-            : Promise.resolve();
-
-          doBind.then(() => {
-            // Use user DN template if available, otherwise search
-            if (ldapConfig.userDnTemplate) {
-              const userDn = ldapConfig.userDnTemplate.replace('{{email}}', email);
-              client.bind(userDn, password, (err: Error | null) => {
-                if (err) {
-                  reject(new Error('LDAP authentication failed: ' + err.message));
-                  return;
-                }
-                // Extract name from DN or use email
-                const nameMatch = userDn.match(/^CN=([^,]+)/i);
-                const displayName = nameMatch ? nameMatch[1] : email.split('@')[0];
-                resolve();
-                findOrCreateLdapUser(email, displayName, userDn).then((user) => {
-                  const token = signToken(user.id, user.email, user.role);
-                  reply.send({
-                    token,
-                    user: {
-                      id: user.id,
-                      email: user.email,
-                      name: user.name,
-                      role: user.role,
-                      authProvider: 'ldap',
-                      createdAt: user.createdAt,
-                    },
-                  });
-                }).catch((err: Error) => {
-                  request.log.error(err, 'Failed to create LDAP user');
-                });
-              });
-            } else {
-              // Search for user
-              const searchFilter = ldapConfig.searchFilter.replace('{{email}}', email);
-              const opts = {
-                filter: searchFilter,
-                scope: 'sub' as const,
-                attributes: [ldapConfig.nameAttribute || 'cn', 'dn'],
-              };
-
-              client.search(ldapConfig.searchBase, opts, (err: Error | null, searchRes: any) => {
-                if (err) {
-                  reject(new Error(`LDAP search failed: ${err.message}`));
-                  return;
-                }
-
-                let userEntry: any = null;
-                searchRes.on('searchEntry', (entry: any) => {
-                  userEntry = entry;
-                });
-
-                searchRes.on('end', () => {
-                  if (!userEntry) {
-                    reject(new Error('User not found in LDAP'));
-                    return;
-                  }
-
-                  const userDn = userEntry.dn.toString();
-                  // Now bind as the user to verify password
-                  client.bind(userDn, password, (bindErr: Error | null) => {
-                    if (bindErr) {
-                      reject(new Error('LDAP authentication failed'));
-                      return;
-                    }
-
-                    const nameAttr = ldapConfig.nameAttribute || 'cn';
-                    const displayName = userEntry.attributes?.find(
-                      (a: any) => a.type === nameAttr
-                    )?.values?.[0] || email.split('@')[0];
-
-                    findOrCreateLdapUser(email, displayName, userDn).then((user) => {
-                      const token = signToken(user.id, user.email, user.role);
-                      reply.send({
-                        token,
-                        user: {
-                          id: user.id,
-                          email: user.email,
-                          name: user.name,
-                          role: user.role,
-                          authProvider: 'ldap',
-                          createdAt: user.createdAt,
-                        },
-                      });
-                    }).catch((err: Error) => {
-                      request.log.error(err, 'Failed to create LDAP user');
-                    });
-                  });
-                });
-
-                searchRes.on('error', (searchErr: Error) => {
-                  reject(new Error(`LDAP search error: ${searchErr.message}`));
-                });
-              });
-            }
-          }).catch(reject);
+        const user = await authenticateLdap(email, password);
+        const token = signToken(user.id, user.email, user.role);
+        return reply.send({
+          token,
+          user: {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            authProvider: 'ldap',
+            createdAt: user.createdAt,
+          },
         });
       } catch (err: any) {
         request.log.error(err, 'LDAP login failed');

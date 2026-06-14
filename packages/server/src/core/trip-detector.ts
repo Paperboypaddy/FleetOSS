@@ -2,40 +2,73 @@ import type { Position } from '@fleetoss/core';
 import { getDb } from '../db/connection.js';
 import { trips, devices } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
-import { reverseGeocode } from './geocode.js';
+import { getRedis } from '../db/redis.js';
+import { enqueueGeocode } from './geocoder.js';
 
 const MOVING_SPEED_THRESHOLD = 2; // mph
 const STOP_DURATION_THRESHOLD = 300; // 5 minutes
+const STATE_TTL = 86400; // 24 hours — clean up stale entries
 
 interface DeviceTripState {
   tripStarted: boolean;
   startPosition: Position;
   startTime: Date;
-  lastPosition: Position; // last processed position (for wasMoving check)
+  lastPosition: Position;
   stopStartTime: number | null;
   maxSpeed: number;
   totalDistance: number;
 }
 
-const deviceState = new Map<string, DeviceTripState>();
+const inMemoryState = new Map<string, DeviceTripState>();
+
+function redisKey(deviceId: string): string {
+  return `trip:state:${deviceId}`;
+}
+
+async function getState(deviceId: string): Promise<DeviceTripState | undefined> {
+  const redis = getRedis();
+  if (redis) {
+    const raw = await redis.get(redisKey(deviceId));
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw) as DeviceTripState;
+    parsed.startTime = new Date(parsed.startTime);
+    return parsed;
+  }
+  return inMemoryState.get(deviceId);
+}
+
+async function setState(deviceId: string, state: DeviceTripState) {
+  const redis = getRedis();
+  if (redis) {
+    await redis.setex(redisKey(deviceId), STATE_TTL, JSON.stringify(state));
+    return;
+  }
+  inMemoryState.set(deviceId, state);
+}
+
+async function deleteState(deviceId: string) {
+  const redis = getRedis();
+  if (redis) {
+    await redis.del(redisKey(deviceId));
+    return;
+  }
+  inMemoryState.delete(deviceId);
+}
 
 export async function detectTrip(deviceId: string, position: Position) {
-  // Check if this device has trip detection disabled
   const db = getDb();
   const devResult = await db.select({ attributes: devices.attributes }).from(devices).where(eq(devices.id, deviceId)).limit(1);
   const devAttrs = (devResult[0]?.attributes || {}) as Record<string, unknown>;
   if (devAttrs['skipTripDetection'] === true) return;
 
-  let state = deviceState.get(deviceId);
+  const state = await getState(deviceId);
   const speed = position.speed || 0;
   const isMoving = speed > MOVING_SPEED_THRESHOLD;
   const wasMoving = state ? (state.lastPosition.speed || 0) > MOVING_SPEED_THRESHOLD : false;
 
   if (!state) {
-    // First position for this device since restart
     if (isMoving) {
-      // Moving from unknown state — start a trip
-      deviceState.set(deviceId, {
+      await setState(deviceId, {
         tripStarted: true,
         startPosition: position,
         startTime: new Date(position.deviceTimestamp),
@@ -49,8 +82,7 @@ export async function detectTrip(deviceId: string, position: Position) {
   }
 
   if (isMoving && !state.tripStarted) {
-    // Trip started — device began moving after being stopped
-    deviceState.set(deviceId, {
+    await setState(deviceId, {
       tripStarted: true,
       startPosition: position,
       startTime: new Date(position.deviceTimestamp),
@@ -61,26 +93,22 @@ export async function detectTrip(deviceId: string, position: Position) {
     });
   } else if (state.tripStarted) {
     if (isMoving) {
-      // Still moving — update trip state, reset stop timer
       const dlat = (position.latitude - state.lastPosition.latitude) * 69;
       const dlng = (position.longitude - state.lastPosition.longitude) * 69 * Math.cos(position.latitude * Math.PI / 180);
       state.totalDistance += Math.sqrt(dlat * dlat + dlng * dlng);
       state.lastPosition = position;
       if (speed > state.maxSpeed) state.maxSpeed = speed;
       state.stopStartTime = null;
-      deviceState.set(deviceId, state);
+      await setState(deviceId, state);
     } else if (!isMoving && wasMoving) {
-      // Just stopped — record when stop started
       state.lastPosition = position;
       state.stopStartTime = Date.now();
-      deviceState.set(deviceId, state);
+      await setState(deviceId, state);
     } else if (!isMoving && !wasMoving && state.stopStartTime) {
-      // Still stopped — check if stop duration threshold exceeded
       const stopDuration = (Date.now() - state.stopStartTime) / 1000;
       state.lastPosition = position;
 
       if (stopDuration >= STOP_DURATION_THRESHOLD) {
-        // Trip ended — device has been stopped long enough
         const endTime = new Date(position.deviceTimestamp);
         const duration = (endTime.getTime() - state.startTime.getTime()) / 1000;
 
@@ -102,30 +130,23 @@ export async function detectTrip(deviceId: string, position: Position) {
             maxSpeed: state.maxSpeed,
           }).returning();
 
-          // Geocode start/end addresses asynchronously
           if (inserted.length) {
             const tripId = inserted[0].id;
-            reverseGeocode(state.startPosition.latitude, state.startPosition.longitude).then(addr => {
-              if (addr) db.update(trips).set({ startAddress: addr }).where(eq(trips.id, tripId)).execute();
-            }).catch(() => {});
-            reverseGeocode(position.latitude, position.longitude).then(addr => {
-              if (addr) db.update(trips).set({ endAddress: addr }).where(eq(trips.id, tripId)).execute();
-            }).catch(() => {});
+            enqueueGeocode(tripId, 'startAddress', state.startPosition.latitude, state.startPosition.longitude);
+            enqueueGeocode(tripId, 'endAddress', position.latitude, position.longitude);
           }
         }
 
-        deviceState.delete(deviceId);
+        await deleteState(deviceId);
       } else {
-        deviceState.set(deviceId, state);
+        await setState(deviceId, state);
       }
     } else {
-      // Position received while trip is active but no state change
       state.lastPosition = position;
-      deviceState.set(deviceId, state);
+      await setState(deviceId, state);
     }
   } else {
-    // Not in a trip — just track last position
     state.lastPosition = position;
-    deviceState.set(deviceId, state);
+    await setState(deviceId, state);
   }
 }

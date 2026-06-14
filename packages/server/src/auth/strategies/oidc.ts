@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { Issuer, generators } from 'openid-client';
+import * as client from 'openid-client';
 import { getDb } from '../../db/connection.js';
 import { users } from '../../db/schema.js';
 import type { AuthStrategy } from './strategy.js';
@@ -7,32 +7,35 @@ import { config } from '../../config/index.js';
 import { signToken } from '../utils.js';
 import { eq } from 'drizzle-orm';
 
-// In-memory state store for OIDC nonce/state
-const stateStore = new Map<string, { nonce: string; state: string; redirectTo: string; expiresAt: number }>();
+interface OidcSession {
+  codeVerifier: string;
+  state: string;
+  redirectTo: string;
+  expiresAt: number;
+}
 
-// Cleanup expired states every 5 minutes
+const sessionStore = new Map<string, OidcSession>();
+
 setInterval(() => {
   const now = Date.now();
-  for (const [key, val] of stateStore) {
-    if (val.expiresAt < now) stateStore.delete(key);
+  for (const [key, val] of sessionStore) {
+    if (val.expiresAt < now) sessionStore.delete(key);
   }
 }, 300_000);
 
-let cachedClient: any = null;
-let cachedIssuer: any = null;
+let oidcConfig: client.Configuration | null = null;
 
-async function getOidcClient() {
-  if (cachedClient) return cachedClient;
-  const oidcConfig = config.auth.oidc;
-  const issuer = await Issuer.discover(oidcConfig.issuer);
-  cachedIssuer = issuer;
-  cachedClient = new issuer.Client({
-    client_id: oidcConfig.clientId,
-    client_secret: oidcConfig.clientSecret,
-    redirect_uris: [oidcConfig.redirectUri],
-    response_types: ['code'],
-  });
-  return cachedClient;
+async function getOidcConfig() {
+  if (oidcConfig) return oidcConfig;
+  const { allowInsecureRequests } = await import('openid-client');
+  allowInsecureRequests = true;
+  const oa = config.auth.oidc;
+  oidcConfig = await client.discovery(
+    new URL(oa.issuer),
+    oa.clientId,
+    oa.clientSecret,
+  );
+  return oidcConfig;
 }
 
 async function findOrCreateOidcUser(email: string, name: string, sub: string) {
@@ -71,25 +74,33 @@ export const oidcStrategy: AuthStrategy = {
     // Initiate OIDC login
     app.get('/api/auth/oidc/login', async (request: any, reply: any) => {
       try {
-        const client = await getOidcClient();
-        const nonce = generators.nonce();
-        const state = generators.state();
+        const oaConfig = await getOidcConfig();
+        const codeVerifier = client.randomPKCECodeVerifier();
+        const codeChallenge = await client.calculatePKCECodeChallenge(codeVerifier);
+        const state = client.randomState();
         const redirectTo = (request.query?.redirect || '/') as string;
 
-        const url = client.authorizationUrl({
+        const parameters: Record<string, string> = {
+          redirect_uri: config.auth.oidc.redirectUri,
           scope: config.auth.oidc.scope,
-          state,
-          nonce,
-        });
+          code_challenge: codeChallenge,
+          code_challenge_method: 'S256',
+        };
 
-        stateStore.set(state, {
-          nonce,
+        if (!oaConfig.serverMetadata().supportsPKCE()) {
+          parameters.state = state;
+        }
+
+        const authUrl = client.buildAuthorizationUrl(oaConfig, parameters);
+
+        sessionStore.set(state, {
+          codeVerifier,
           state,
           redirectTo,
-          expiresAt: Date.now() + 600_000, // 10 minutes
+          expiresAt: Date.now() + 600_000,
         });
 
-        return reply.redirect(302, url);
+        return reply.redirect(302, authUrl.href);
       } catch (err: any) {
         request.log.error(err, 'OIDC login initiation failed');
         return reply.code(500).send({ error: 'Failed to initiate SSO login' });
@@ -99,32 +110,44 @@ export const oidcStrategy: AuthStrategy = {
     // OIDC callback
     app.get('/api/auth/oidc/callback', async (request: any, reply: any) => {
       try {
-        const client = await getOidcClient();
-        const params = client.callbackParams(request.url);
-        const stored = stateStore.get(params.state as string);
+        const oaConfig = await getOidcConfig();
+        const currentUrl = new URL(request.url, config.baseUrl);
+        const params = Object.fromEntries(currentUrl.searchParams.entries());
+        const stateParam = params.state || '';
 
+        const stored = sessionStore.get(stateParam);
         if (!stored) {
           return reply.code(400).send({ error: 'Invalid state parameter' });
         }
-        stateStore.delete(params.state as string);
+        sessionStore.delete(stateParam);
 
-        const tokenSet = await client.callback(config.auth.oidc.redirectUri, params, {
-          nonce: stored.nonce,
-          state: stored.state,
-        });
+        const tokens = await client.authorizationCodeGrant(
+          oaConfig,
+          currentUrl,
+          {
+            pkceCodeVerifier: stored.codeVerifier,
+            expectedState: stored.state,
+          },
+        );
 
-        const userinfo = await client.userinfo(tokenSet.access_token!);
-        const email = userinfo.email || userinfo.preferred_username || '';
-        const name = userinfo[config.auth.oidc.nameClaim] || userinfo.name || email.split('@')[0] || 'User';
+        // Fetch user info
+        const userInfo = await client.fetchUserInfo(
+          oaConfig,
+          tokens.access_token,
+          '' as any,
+          undefined,
+        );
+
+        const email = (userInfo.email || userInfo.preferred_username || '') as string;
+        const name = (userInfo[config.auth.oidc.nameClaim] || userInfo.name || email.split('@')[0] || 'User') as string;
 
         if (!email) {
           return reply.code(400).send({ error: 'Email not provided by identity provider' });
         }
 
-        const user = await findOrCreateOidcUser(email, name, userinfo.sub);
+        const user = await findOrCreateOidcUser(email, name, userInfo.sub as string);
         const token = signToken(user.id, user.email, user.role);
 
-        // Redirect back to the frontend with the token as a hash fragment
         const frontendUrl = config.baseUrl.replace(/:\d+$/, ':5173');
         return reply.redirect(302, `${frontendUrl}/#/sso?token=${token}&user=${encodeURIComponent(JSON.stringify({
           id: user.id,

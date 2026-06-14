@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import { getDb } from '../../db/connection.js';
@@ -34,7 +34,7 @@ export const localStrategy: AuthStrategy = {
 
   registerRoutes(app: FastifyInstance) {
     // Register first admin user (only works if no users exist yet)
-    app.post<{ Body: { email?: string; name?: string; password?: string } }>('/api/auth/register', async (request: FastifyRequest, reply: FastifyReply) => {
+    app.post('/api/auth/register', async (request: any, reply: any) => {
       try {
         const db = getDb();
         const existing = await db.select().from(users).limit(1);
@@ -42,7 +42,7 @@ export const localStrategy: AuthStrategy = {
           return reply.code(403).send({ error: 'Setup already completed' });
         }
 
-        const { email, name, password } = request.body;
+        const { email, name, password } = request.body || {};
         if (!email || !name || !password || password.length < 6) {
           return reply.code(400).send({ error: 'Email, name, and password (6+ chars) required' });
         }
@@ -50,17 +50,17 @@ export const localStrategy: AuthStrategy = {
         const user = await registerUser(email, name, password);
         const token = signToken(user.id, email, 'admin');
         return reply.send({ token, user: { id: user.id, email, name, role: 'admin', authProvider: 'local' } });
-      } catch (err: unknown) {
-        if (err instanceof Error && 'code' in err && (err as Record<string, unknown>).code === '23505') return reply.code(409).send({ error: 'Email already exists' });
+      } catch (err: any) {
+        if (err?.code === '23505') return reply.code(409).send({ error: 'Email already exists' });
         request.log.error(err, 'Registration failed');
         return reply.code(500).send({ error: 'Internal server error' });
       }
     });
 
     // Local login
-    app.post<{ Body: { email?: string; password?: string } }>('/api/auth/login', async (request: FastifyRequest, reply: FastifyReply) => {
+    app.post('/api/auth/login', async (request: any, reply: any) => {
       try {
-        const { email, password } = request.body;
+        const { email, password } = request.body || {};
         if (!email || !password) {
           return reply.code(400).send({ error: 'Email and password required' });
         }
@@ -82,14 +82,14 @@ export const localStrategy: AuthStrategy = {
             createdAt: user.createdAt,
           },
         });
-      } catch (err: unknown) {
+      } catch (err: any) {
         request.log.error(err, 'Login failed');
         return reply.code(500).send({ error: 'Internal server error' });
       }
     });
 
     // Verify token / get current user
-    app.get('/api/auth/me', { preHandler: authMiddleware }, async (request: FastifyRequest, reply: FastifyReply) => {
+    app.get('/api/auth/me', { preHandler: authMiddleware }, async (request: any, reply: any) => {
       return reply.send({ user: request.user });
     });
   },

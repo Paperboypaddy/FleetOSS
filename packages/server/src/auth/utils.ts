@@ -9,12 +9,18 @@ declare module 'fastify' {
 }
 
 export function signToken(userId: string, email: string, role: string): string {
-  return jwt.sign({ sub: userId, email, role }, config.jwtSecret, { expiresIn: config.jwtExpiresIn || '7d' });
+  return jwt.sign({ sub: userId, email, role }, config.jwtSecret, {
+    expiresIn: config.jwtExpiresIn,
+  } as jwt.SignOptions);
 }
 
 export function verifyToken(token: string): { sub: string; email: string; role: string } | null {
   try {
-    return jwt.verify(token, config.jwtSecret) as { sub: string; email: string; role: string };
+    const payload = jwt.verify(token, config.jwtSecret) as Record<string, unknown>;
+    if (typeof payload.sub === 'string' && typeof payload.email === 'string' && typeof payload.role === 'string') {
+      return { sub: payload.sub, email: payload.email, role: payload.role };
+    }
+    return null;
   } catch {
     return null;
   }
@@ -29,5 +35,5 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
   if (!payload) {
     return reply.code(401).send({ error: 'Invalid or expired token' });
   }
-  request.user = payload;
+  request.user = { ...payload, authProvider: 'local' };
 }

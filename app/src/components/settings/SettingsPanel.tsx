@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getAuthToken } from '../../lib/auth'
+import SsoSettings from './SsoSettings'
 
 interface ServerStats {
   devices: number; positions: number; trips: number; onlineDevices: number
@@ -14,7 +15,7 @@ interface Device {
   plate?: string | null
 }
 
-type SettingsTab = 'general' | 'users' | 'devices' | 'personal'
+type SettingsTab = 'general' | 'users' | 'devices' | 'personal' | 'sso'
 
 function authFetch(path: string, options: RequestInit = {}) {
   const headers: Record<string, string> = { ...(options.headers as Record<string, string> || {}) }
@@ -142,6 +143,7 @@ export default function SettingsPanel({ showToast, colorTheme, onColorThemeChang
     { id: 'personal', label: 'Personal' },
     { id: 'users', label: 'Users' },
     { id: 'devices', label: 'Devices' },
+    { id: 'sso', label: 'SSO' },
   ]
 
   const fmtUptime = (s: number) => `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`
@@ -518,6 +520,7 @@ export default function SettingsPanel({ showToast, colorTheme, onColorThemeChang
             </div>
           </div>
         )}
+        {tab === 'sso' && <SsoSettings showToast={showToast} />}
       </div>
     </div>
   )

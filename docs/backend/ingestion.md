@@ -8,10 +8,9 @@ The ingestion system is designed to be **protocol-agnostic** — any GPS device 
 GPS Device / Android App (any protocol)
         │
         ▼
-  ┌─────────────┐
-  │  Fastify    │
-  │  Server     │
-  └──────┬──────┘
+  ┌──────────────┐
+  │ Rate Limiter  │  ← Sliding window (60 req/min/IP)
+  └──────┬───────┘
          │
   ┌──────┴──────┐
   │  Protocol   │  ← Pluggable: one file per protocol
@@ -22,13 +21,19 @@ GPS Device / Android App (any protocol)
   │  Repository │  ← Stores in PostgreSQL
   └──────┬──────┘
          │
+    ┌────┴────┐
+    │         │
+    ▼         ▼
+  WS        Redis
+  clients   Pub/Sub
+    │         │
+    │    ┌────┴────┐
+    │    │ Geocode │
+    │    │ Queue   │  ← BLPOP worker → Nominatim
+    │    └─────────┘
+    │
   ┌──────┴──────┐
-  │  WebSocket  │  ← Broadcasts to connected clients
-  │  Broadcast  │
-  └──────┬──────┘
-         │
-  ┌──────┴──────┐
-  │  Trip       │  ← Server-side trip detection
+  │  Trip       │  ← Redis-backed state (persistent)
   │  Detector   │
   └─────────────┘
 ```
@@ -37,6 +42,8 @@ GPS Device / Android App (any protocol)
 
 ### `POST /api/ingest`
 Accept a single GPS position.
+
+**Rate limiting:** 60 requests per minute per IP (sliding window via Redis sorted sets). Returns `429 Too Many Requests` when exceeded. Falls open (allows all) if Redis is unavailable.
 
 **Request body (JSON):**
 ```json

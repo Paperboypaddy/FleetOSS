@@ -126,3 +126,13 @@ export const fuelEntries = pgTable('fuel_entries', {
   attributes: jsonb('attributes').default({}).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+export const authProviders = pgTable('auth_providers', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  providerType: text('provider_type', { enum: ['ldap', 'oidc', 'oauth2', 'saml'] }).notNull(),
+  name: text('name').notNull(),
+  enabled: boolean('enabled').default(false).notNull(),
+  config: jsonb('config').default({}).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});

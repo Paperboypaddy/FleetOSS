@@ -13,6 +13,7 @@ The FleetOSS backend is a **Fastify 5** API server with **PostgreSQL + PostGIS**
 | PostGIS 3.4 | Geospatial extension (geometry indexes, spatial queries) |
 | Zod | Runtime request validation (used in ingestion) |
 | @fastify/websocket | WebSocket for real-time position streaming |
+| ioredis | Redis client (trip state, geocode queue, Pub/Sub, rate limiting) |
 | pg (node-postgres) | PostgreSQL driver |
 | pino-pretty | Human-readable logging |
 
@@ -25,6 +26,7 @@ packages/server/src/
 │   └── index.ts                    # Environment config loader
 ├── db/
 │   ├── connection.ts               # Drizzle + pg Pool singleton
+│   ├── redis.ts                    # Redis singleton (lazy, graceful fallback)
 │   ├── schema.ts                   # Drizzle ORM table definitions
 │   ├── migrate.ts                  # Raw SQL migration script
 │   ├── seed.ts                     # Demo data seeder
@@ -32,16 +34,20 @@ packages/server/src/
 │       ├── device.ts               # Device CRUD operations
 │       └── position.ts             # Position insert/query operations
 ├── ingestion/
-│   ├── server.ts                   # POST /api/ingest and /api/ingest/batch
-│   └── protocols/
-│       └── http-json.ts            # HTTP/JSON GPS protocol parser
+│   ├── server.ts                   # POST /api/ingest (rate-limited), /api/ingest/batch
+│   ├── protocols/                  # http-json, traccar
+│   └── handlers/                   # NMEA, GT06, TK103, Teltonika, Queclink
 ├── api/
-│   └── routes/
-│       └── devices.ts              # GET /api/devices, GET /api/devices/:id
+│   ├── errors.ts                   # AppError class + global error handler
+│   └── routes/                     # devices, trips, positions, users, geofences, etc.
 ├── realtime/
-│   └── index.ts                    # WebSocket server + broadcast
+│   └── index.ts                    # WebSocket + Redis Pub/Sub fan-out
 └── core/
-    └── trip-detector.ts            # Speed-based trip start/end detection
+    ├── trip-detector.ts            # Redis-backed trip detection (in-memory fallback)
+    ├── geocode.ts                  # Nominatim reverse geocoding (direct)
+    ├── geocoder.ts                 # Async geocode job queue (Redis list)
+    ├── geocoder-worker.ts          # Background BLPOP worker, rate-limited
+    └── rate-limiter.ts             # Sliding window per-IP (Redis sorted sets)
 ```
 
 ## Request Flow
@@ -52,12 +58,14 @@ GPS Device / Android App
         ▼
 POST /api/ingest
         │
+        ├─ Rate limit check (60 req/min per IP, Redis sliding window)
         ├─ Zod validation (parseHttpJson)
         ├─ findOrCreateDevice (auto-registers unknown devices)
         ├─ insertPosition (stores in PostgreSQL)
         ├─ updateDeviceStatus (marks device online)
-        ├─ broadcastPosition (pushes to WebSocket clients)
-        └─ detectTrip (evaluates trip start/end)
+        ├─ broadcastPosition (pushes to WS clients + Redis Pub/Sub)
+        ├─ detectTrip (Redis-backed, survives restarts)
+        └─ enqueueGeocode (Redis list → background worker → Nominatim)
 ```
 
 ## Configuration

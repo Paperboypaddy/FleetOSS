@@ -40,6 +40,24 @@ services:
     ports:
       - '6379:6379'
 
+  # Keycloak for testing OIDC, SAML, and OAuth2 auth providers
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.1
+    container_name: fleetoss-keycloak
+    restart: unless-stopped
+    ports:
+      - '8080:8080'
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HOSTNAME: localhost
+      KC_HTTP_RELATIVE_PATH: /
+    command: start-dev --import-realm
+    volumes:
+      - keycloak_data:/opt/keycloak/data
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+
 volumes:
   pgdata:
   minio_data:
+  keycloak_data:

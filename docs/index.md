@@ -48,13 +48,27 @@ fleetoss/
 │       └── src/
 │           ├── index.ts         # Entry (dual-port: 4000 + 5055)
 │           ├── config/          # Environment config
-│           ├── auth/            # JWT sign/verify, register, login
-│           ├── db/              # Schema, migrations, repos
-│           ├── ingestion/       # Protocol parsers
-│           │   └── protocols/   # http-json, traccar
-│           ├── api/routes/      # REST endpoints
-│           ├── realtime/        # WebSocket broadcasting
-│           └── core/            # Trip detection, geocoding
+│           ├── auth/            # JWT, LDAP, OIDC, OAuth2, SAML strategies
+│           ├── db/
+│           │   ├── connection.ts    # Drizzle + pg Pool singleton
+│           │   ├── redis.ts         # Redis singleton (lazy, graceful fallback)
+│           │   ├── schema.ts        # Drizzle ORM table definitions
+│           │   ├── migrate.ts       # Raw SQL migrations
+│           │   └── repositories/    # Device, position, etc.
+│           ├── ingestion/       # Protocol parsers (HTTP, Traccar, TCP)
+│           │   ├── server.ts    # POST /api/ingest (with rate limiting)
+│           │   ├── protocols/   # http-json, traccar, nmea, tk103, etc.
+│           │   └── handlers/    # NMEA, GT06, TK103, Teltonika, Queclink
+│           ├── api/
+│           │   ├── errors.ts    # AppError class + global error handler
+│           │   └── routes/      # devices, trips, positions, users, etc.
+│           ├── realtime/        # WebSocket + Redis Pub/Sub fan-out
+│           └── core/
+│               ├── trip-detector.ts  # Redis-backed trip detection
+│               ├── geocode.ts        # Nominatim caller (direct)
+│               ├── geocoder.ts       # Async geocode job queue
+│               ├── geocoder-worker.ts # BLPOP worker, rate-limited
+│               └── rate-limiter.ts   # Sliding window per-IP
 ├── docker-compose.yml           # PostGIS, MinIO, Redis
 └── fleet-tracker.html           # Original prototype (reference only)
 ```

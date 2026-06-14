@@ -160,6 +160,18 @@ async function migrate() {
       )
     `);
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS auth_providers (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        provider_type TEXT NOT NULL CHECK (provider_type IN ('ldap', 'oidc', 'oauth2', 'saml')),
+        name TEXT NOT NULL,
+        enabled BOOLEAN NOT NULL DEFAULT false,
+        config JSONB NOT NULL DEFAULT '{}',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
     console.log('Migration complete');
   } finally {
     client.release();
