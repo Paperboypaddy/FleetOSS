@@ -47,12 +47,16 @@ export async function handleTraccarIngest(request: FastifyRequest, reply: Fastif
     const coords = location?.coords;
 
     if (deviceId && coords?.latitude != null && coords?.longitude != null) {
+      // Background Geolocation sends speed in m/s — convert to mph
+      const speedMs = coords.speed
+      const speedMph = speedMs != null && speedMs >= 0 ? speedMs * 2.237 : undefined
+
       const bgData: import('@fleetoss/core').IngestedPosition = {
         deviceId,
         latitude: coords.latitude,
         longitude: coords.longitude,
         altitude: coords.altitude,
-        speed: coords.speed,
+        speed: speedMph,
         bearing: coords.heading || coords.bearing,
         accuracy: coords.accuracy,
         odometer: location.odometer,
