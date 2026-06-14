@@ -33,10 +33,14 @@ export default function LoginPage() {
         <div className="text-center mb-6">
           {(() => {
             const logo = localStorage.getItem('fleetoss-logo')
-            if (logo) return <img src={logo} alt="" className="h-10 w-auto max-w-[160px] object-contain mx-auto mb-3" />
-            return <div className="w-10 h-10 bg-cyan rounded-xl flex items-center justify-center mx-auto mb-3">
-              <svg viewBox="0 0 24 24" fill="#0F1117" className="w-6 h-6"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-            </div>
+            return (
+              <div className="flex flex-col items-center gap-2 mb-3">
+                {logo && <img src={logo} alt="" className="h-10 w-auto max-w-[160px] object-contain" />}
+                {!logo && <div className="w-10 h-10 bg-cyan rounded-xl flex items-center justify-center">
+                  <svg viewBox="0 0 24 24" fill="#0F1117" className="w-6 h-6"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                </div>}
+              </div>
+            )
           })()}
           <h1 className="text-lg font-semibold">{localStorage.getItem('fleetoss-site-name') || 'FleetOSS'}</h1>
           <p className="text-xs text-text-muted mt-1">{isRegister ? 'Create admin account' : 'Sign in to continue'}</p>

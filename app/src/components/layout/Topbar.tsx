@@ -18,8 +18,13 @@ export default function Topbar({ activePanel, deviceCount }: TopbarProps) {
     <div className="h-13 bg-surface border-b border-border flex items-center px-4 gap-3 shrink-0">
       {(() => {
         const logo = localStorage.getItem('fleetoss-logo')
-        if (logo) return <img src={logo} alt="" className="h-7 w-auto max-w-[140px] object-contain" />
-        return <span className="font-mono text-xs font-bold text-cyan tracking-wider">{localStorage.getItem('fleetoss-site-name') || 'FleetOSS'}</span>
+        const name = localStorage.getItem('fleetoss-site-name') || 'FleetOSS'
+        return (
+          <div className="flex items-center gap-2">
+            {logo && <img src={logo} alt="" className="h-7 w-auto max-w-[100px] object-contain" />}
+            <span className="font-mono text-xs font-bold text-cyan tracking-wider">{name}</span>
+          </div>
+        )
       })()}
       <div className="w-px h-5 bg-border" />
       <div className="flex gap-0.5">
