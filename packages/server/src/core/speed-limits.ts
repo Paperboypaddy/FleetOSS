@@ -1,27 +1,29 @@
 // Speed limit lookup using OpenStreetMap Overpass API
+// Results are cached server-side; stored in the database after resolution
 
 interface SpeedLimitResult {
-  speed: number | null // mph, null if unknown
+  speed: number | null
   source: string
 }
 
-// Default speed limits by highway type (US defaults)
+const highwayPriority: Record<string, number> = {
+  motorway: 10, motorway_link: 9,
+  trunk: 8, trunk_link: 7,
+  primary: 6, primary_link: 5,
+  secondary: 4, secondary_link: 3,
+  tertiary: 2, tertiary_link: 1,
+  residential: 0, living_street: 0, service: 0, unclassified: 0, road: 0,
+}
+
+// Default speed limits by highway type (US defaults, mph)
 const highwayDefaults: Record<string, number> = {
-  motorway: 65,
-  motorway_link: 55,
-  trunk: 60,
-  trunk_link: 50,
-  primary: 55,
-  primary_link: 45,
-  secondary: 45,
-  secondary_link: 35,
-  tertiary: 35,
-  tertiary_link: 30,
-  residential: 25,
-  living_street: 15,
-  service: 15,
-  unclassified: 35,
-  road: 35,
+  motorway: 65, motorway_link: 55,
+  trunk: 60, trunk_link: 50,
+  primary: 55, primary_link: 45,
+  secondary: 45, secondary_link: 35,
+  tertiary: 35, tertiary_link: 30,
+  residential: 25, living_street: 15, service: 15,
+  unclassified: 35, road: 35,
 }
 
 function parseSpeed(raw: string): number | null {
@@ -34,7 +36,7 @@ function parseSpeed(raw: string): number | null {
 }
 
 let lastRequestTime = 0
-const MIN_REQUEST_INTERVAL = 300 // ms between Overpass requests
+const MIN_REQUEST_INTERVAL = 200
 
 async function queryOverpass(query: string): Promise<any> {
   const now = Date.now()
@@ -49,35 +51,49 @@ async function queryOverpass(query: string): Promise<any> {
       'User-Agent': 'FleetOSS/1.0',
     },
     body: `data=${encodeURIComponent(query)}`,
-    signal: AbortSignal.timeout(10000),
+    signal: AbortSignal.timeout(15000),
   })
   if (!res.ok) return null
   return res.json()
 }
 
 async function lookupSpeedLimit(lat: number, lng: number): Promise<SpeedLimitResult> {
-  // First try: find road with explicit maxspeed tag within 200m
-  const q1 = `[out:json][timeout:10];way(around:200,${lat},${lng})["highway"]["maxspeed"];out tags 1;`
-  const d1 = await queryOverpass(q1)
-  if (d1?.elements?.length) {
-    const raw = d1.elements[0].tags.maxspeed
-    const speed = parseSpeed(raw)
-    if (speed) return { speed, source: 'osm' }
-  }
+  // Query all highways within 200m, return up to 5
+  const q = `[out:json][timeout:10];way(around:200,${lat},${lng})["highway"];out tags 5;`
+  const data = await queryOverpass(q)
+  if (!data?.elements?.length) return { speed: null, source: 'not_found' }
 
-  // Second try: find any highway and estimate from road type
-  const q2 = `[out:json][timeout:10];way(around:200,${lat},${lng})["highway"];out tags 1;`
-  const d2 = await queryOverpass(q2)
-  if (d2?.elements?.length) {
-    const hw = d2.elements[0].tags.highway
-    const name = d2.elements[0].tags.name || ''
-    if (hw && highwayDefaults[hw]) {
-      return { speed: highwayDefaults[hw], source: `estimated_${hw}` }
+  // Sort by road priority (highest first) and find the best speed limit
+  const roads = data.elements as Array<{ tags: Record<string, string> }>
+
+  // First pass: find highest priority road with an explicit maxspeed
+  let bestExplicit: { priority: number; speed: number } | null = null
+  // Second pass: find highest priority road for estimation
+  let bestEstimate: { priority: number; speed: number; hw: string } | null = null
+
+  for (const road of roads) {
+    const hw = road.tags.highway
+    const priority = highwayPriority[hw] ?? -1
+    if (priority < 0) continue
+
+    // Check for explicit maxspeed
+    const maxspeed = road.tags.maxspeed || road.tags['maxspeed:forward'] || road.tags['maxspeed:backward']
+    if (maxspeed) {
+      const parsed = parseSpeed(maxspeed)
+      if (parsed && (!bestExplicit || priority > bestExplicit.priority)) {
+        bestExplicit = { priority, speed: parsed }
+      }
     }
-    return { speed: null, source: `no_default_${hw || 'unknown'}` }
+
+    // Track best road type for estimation
+    if (!bestExplicit && highwayDefaults[hw] && (!bestEstimate || priority > bestEstimate.priority)) {
+      bestEstimate = { priority, speed: highwayDefaults[hw], hw }
+    }
   }
 
-  return { speed: null, source: 'not_found' }
+  if (bestExplicit) return { speed: bestExplicit.speed, source: 'osm' }
+  if (bestEstimate) return { speed: bestEstimate.speed, source: `estimated_${bestEstimate.hw}` }
+  return { speed: null, source: 'no_match' }
 }
 
 const cache = new Map<string, SpeedLimitResult>()
@@ -95,42 +111,22 @@ export async function getSpeedLimit(lat: number, lng: number): Promise<SpeedLimi
   return result
 }
 
-// Resolve speed limit for a single position and update DB (fire-and-forget)
-export async function resolveSpeedLimitForPosition(positionId: string, lat: number, lng: number): Promise<void> {
-  try {
-    const result = await getSpeedLimit(lat, lng);
-    if (result.speed != null) {
-      const { getDb } = await import('../db/connection.js');
-      const { positions } = await import('../db/schema.js');
-      const { eq } = await import('drizzle-orm');
-      const db = getDb();
-      await db.update(positions).set({ speedLimit: result.speed }).where(eq(positions.id, positionId));
-    }
-  } catch {}
+export async function getSpeedLimits(coords: Array<[number, number]>): Promise<(number | null)[]> {
+  return Promise.all(coords.map(async ([lat, lng]) => {
+    const r = await getSpeedLimit(lat, lng)
+    return r.speed
+  }))
 }
 
-export async function getSpeedLimits(coords: Array<[number, number]>): Promise<(number | null)[]> {
-  const results: (number | null)[] = []
-  const queries: Array<{ lat: number; lng: number; idx: number }> = []
-
-  for (let i = 0; i < coords.length; i++) {
-    const [lat, lng] = coords[i]
-    const key = cacheKey(lat, lng)
-    const cached = cache.get(key)
-    if (cached) {
-      results[i] = cached.speed
-    } else {
-      results[i] = null
-      queries.push({ lat, lng, idx: i })
+export async function resolveSpeedLimitForPosition(positionId: string, lat: number, lng: number): Promise<void> {
+  try {
+    const result = await getSpeedLimit(lat, lng)
+    if (result.speed != null) {
+      const { getDb } = await import('../db/connection.js')
+      const { positions } = await import('../db/schema.js')
+      const { eq } = await import('drizzle-orm')
+      const db = getDb()
+      await db.update(positions).set({ speedLimit: result.speed }).where(eq(positions.id, positionId))
     }
-  }
-
-  for (const q of queries) {
-    const result = await lookupSpeedLimit(q.lat, q.lng)
-    const key = cacheKey(q.lat, q.lng)
-    cache.set(key, result)
-    results[q.idx] = result.speed
-  }
-
-  return results
+  } catch {}
 }
