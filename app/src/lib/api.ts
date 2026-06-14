@@ -257,6 +257,7 @@ export async function fetchTrips(): Promise<FrontendTrip[]> {
 export interface TripPoint {
   latlng: [number, number]
   speed: number
+  speedLimit?: number | null
 }
 
 export async function updateTrip(tripId: string, data: { type?: string; purpose?: string }): Promise<void> {
@@ -298,10 +299,52 @@ export async function fetchTripPositions(deviceId: string, from: string, to: str
     const res = await apiFetch(`/devices/${deviceId}/positions?from=${fromParam}&to=${toParam}&limit=1000`)
     if (!res.ok) return []
     const positions: ApiPosition[] = await res.json()
-    return positions.reverse().map(p => ({
+    const points = positions.reverse().map(p => ({
       latlng: [p.latitude, p.longitude] as [number, number],
       speed: (p.speed != null && p.speed >= 0) ? Math.round(p.speed) : 0,
+      speedLimit: undefined as number | undefined | null,
     }))
+
+    // Fetch speed limits for the route (sample every ~10 points to reduce API load)
+    if (points.length > 5) {
+      const sampleStep = Math.max(1, Math.floor(points.length / 50))
+      const sampleCoords: [number, number][] = []
+      const sampleIndices: number[] = []
+      for (let i = 0; i < points.length; i += sampleStep) {
+        sampleCoords.push(points[i].latlng)
+        sampleIndices.push(i)
+      }
+      try {
+        const slRes = await fetch('/api/speedlimits', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ coords: sampleCoords }),
+        })
+        if (slRes.ok) {
+          const { limits } = await slRes.json()
+          for (let j = 0; j < sampleIndices.length; j++) {
+            points[sampleIndices[j]].speedLimit = limits[j]
+          }
+          // Fill gaps between sampled points
+          let lastLimit: number | null | undefined
+          let nextLimit: number | null | undefined
+          for (let i = 0; i < points.length; i++) {
+            if (points[i].speedLimit !== undefined) {
+              lastLimit = points[i].speedLimit
+            }
+            // Find next defined limit
+            let nextIdx = i + 1
+            while (nextIdx < points.length && points[nextIdx].speedLimit === undefined) nextIdx++
+            nextLimit = nextIdx < points.length ? points[nextIdx].speedLimit : lastLimit
+            if (points[i].speedLimit === undefined) {
+              points[i].speedLimit = lastLimit ?? nextLimit ?? null
+            }
+          }
+        }
+      } catch {}
+    }
+
+    return points
   } catch {
     return []
   }

@@ -64,8 +64,9 @@ function AppContent() {
     const points = await fetchTripPositions(trip.deviceId, trip.startTimeIso, trip.endTimeIso)
     const wpts = points.length >= 2 ? points.map(p => p.latlng) : trip.waypoints
     const spds = points.length >= 2 ? points.map(p => p.speed) : []
+    const spdLimits = points.length >= 2 ? points.map(p => p.speedLimit) : []
     await new Promise(r => setTimeout(r, 100))
-    mapRef.current?.showTripOnMap(trip, wpts, spds)
+    mapRef.current?.showTripOnMap(trip, wpts, spds, spdLimits)
   }, [])
 
   const handleRenameDevice = useCallback(async (deviceId: string, newName: string) => {

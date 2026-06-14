@@ -228,6 +228,14 @@ export default function PlaybackBar({ pb, onSeek }: PlaybackBarProps) {
             <span className="text-[9px] text-text-muted uppercase tracking-wider">Speed</span>
             <span className="font-mono text-sm font-bold leading-tight" style={{ color: speedColor(spd) }}>{spd} mph</span>
           </div>
+          {pb.speedLimits?.[idx] != null && (
+            <div className="flex flex-col items-center px-2.5 py-1 bg-surface border border-border rounded-md min-w-[64px]">
+              <span className="text-[9px] text-text-muted uppercase tracking-wider">Limit</span>
+              <span className={`font-mono text-sm font-bold leading-tight ${spd > pb.speedLimits[idx]! ? 'text-red' : 'text-green'}`}>
+                {pb.speedLimits[idx]} mph{pb.speedLimits[idx] && spd > pb.speedLimits[idx]! ? ' ⚠' : ''}
+              </span>
+            </div>
+          )}
           <div className="flex flex-col items-center px-2.5 py-1 bg-surface border border-border rounded-md min-w-[64px]">
             <span className="text-[9px] text-text-muted uppercase tracking-wider">Covered</span>
             <span className="font-mono text-sm font-bold leading-tight">{coveredMi.toFixed(1)} mi</span>

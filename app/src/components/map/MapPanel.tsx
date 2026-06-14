@@ -10,7 +10,7 @@ import type { FrontendDevice, FrontendTrip } from '../../lib/api';
 import { timeAgo } from '../../lib/api';
 
 export interface MapPanelHandle {
-  showTripOnMap: (trip: FrontendTrip, waypoints: [number, number][], actualSpeeds?: number[]) => Promise<void>;
+  showTripOnMap: (trip: FrontendTrip, waypoints: [number, number][], actualSpeeds?: number[], speedLimits?: (number | null | undefined)[]) => Promise<void>;
 }
 
 interface MapPanelProps {
@@ -159,7 +159,7 @@ const MapPanel = forwardRef<MapPanelHandle, MapPanelProps>(function MapPanel({ d
     }
   }, [pb?.currentSec, pb?.active]);
 
-  const showTripOnMap = useCallback(async (trip: FrontendTrip, wpts: [number, number][], actualSpeeds?: number[]) => {
+  const showTripOnMap = useCallback(async (trip: FrontendTrip, wpts: [number, number][], actualSpeeds?: number[], speedLimits?: (number | null | undefined)[]) => {
     clearTripLayers();
     setPb(null);
     const t = trip;
@@ -168,13 +168,16 @@ const MapPanel = forwardRef<MapPanelHandle, MapPanelProps>(function MapPanel({ d
     // Downsample to ~200 points max for performance
     let coords = wpts;
     let speeds: number[];
+    let limits: (number | null | undefined)[] = []
     if (coords.length > 200) {
       const step = coords.length / 200;
       const indices = Array.from({ length: 200 }, (_, i) => Math.min(Math.floor(i * step), coords.length - 1));
       coords = indices.map(i => wpts[i]);
       speeds = actualSpeeds?.length ? indices.map(i => actualSpeeds[i]) : [];
+      limits = speedLimits?.length ? indices.map(i => speedLimits[i]) : [];
     } else {
       speeds = actualSpeeds || [];
+      limits = speedLimits || []
     }
 
     const totalDur = t.durationSec;
@@ -192,7 +195,7 @@ const MapPanel = forwardRef<MapPanelHandle, MapPanelProps>(function MapPanel({ d
 
     const newPb: PlaybackState = {
       active: true, playing: false,
-      route: null, coords, speeds, totalDur, currentSec: 0, speed: 5,
+      route: null, coords, speeds, speedLimits: limits, totalDur, currentSec: 0, speed: 5,
       rafId: null, lastTs: null, tripData: t, cumDist,
       fullLine: null, doneLine: null, vehicleMarker: null, startMarker: null, endMarker: null, segLayers: [],
     };
@@ -209,12 +212,18 @@ const MapPanel = forwardRef<MapPanelHandle, MapPanelProps>(function MapPanel({ d
       const elapsed = totalDur * (i / (coords.length - 1));
       const mins = Math.floor(elapsed / 60), secs = Math.floor(elapsed % 60);
       const timeStr = addMins(t.startTime, mins);
+      const limit = limits[i]
+      const overLimit = limit != null && spd > limit
+      const limitHtml = limit != null
+        ? `<div style="display:flex;gap:10px;justify-content:space-between"><span style="color:#64748B">Speed Limit</span><span style="font-weight:600;color:${overLimit ? '#EF4444' : '#10B981'}">${limit} mph${overLimit ? ' ⚠' : ''}</span></div>`
+        : ''
       const seg = L.polyline([coords[i], coords[i + 1]], {
-        color: speedColor(spd), weight: 5, opacity: 0.7,
+        color: overLimit ? '#EF4444' : speedColor(spd), weight: 5, opacity: 0.7,
       }).bindTooltip(
-        `<div style="display:flex;gap:10px;justify-content:space-between;margin-bottom:2px"><span style="color:#64748B">Speed</span><span style="font-weight:600;color:${speedColor(spd)}">${spd} mph</span></div>
+        `<div style="display:flex;gap:10px;justify-content:space-between;margin-bottom:2px"><span style="color:#64748B">Speed</span><span style="font-weight:600;color:${overLimit ? '#EF4444' : speedColor(spd)}">${spd} mph</span></div>
         <div style="display:flex;gap:10px;justify-content:space-between;margin-bottom:2px"><span style="color:#64748B">Time</span><span style="font-weight:600">${timeStr}</span></div>
-        <div style="display:flex;gap:10px;justify-content:space-between"><span style="color:#64748B">Elapsed</span><span style="font-weight:600">${mins}m ${secs}s</span></div>`,
+        <div style="display:flex;gap:10px;justify-content:space-between"><span style="color:#64748B">Elapsed</span><span style="font-weight:600">${mins}m ${secs}s</span></div>
+        ${limitHtml}`,
         { className: 'trail-tooltip', sticky: true, direction: 'top', offset: [0, -6] },
       );
       seg.on('click', () => {

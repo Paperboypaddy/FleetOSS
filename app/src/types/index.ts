@@ -58,6 +58,7 @@ export interface PlaybackState {
   route: any | null;
   coords: [number, number][];
   speeds: number[];
+  speedLimits: (number | null | undefined)[];
   totalDur: number;
   currentSec: number;
   speed: number;

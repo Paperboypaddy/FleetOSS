@@ -12,6 +12,7 @@ import { registerGeofenceRoutes } from './api/routes/geofences.js';
 import { registerEventRoutes } from './api/routes/events.js';
 import { registerMaintenanceRoutes } from './api/routes/maintenance.js';
 import { registerFuelRoutes } from './api/routes/fuel.js';
+import { registerSpeedLimitRoutes } from './api/routes/speedlimits.js';
 import { registerStatsRoutes } from './api/routes/stats.js';
 import { registerRealtime } from './realtime/index.js';
 import { startTcpServer } from './ingestion/tcp-server.js';
@@ -54,6 +55,7 @@ async function main() {
   registerEventRoutes(app);
   registerMaintenanceRoutes(app);
   registerFuelRoutes(app);
+  registerSpeedLimitRoutes(app);
   registerStatsRoutes(app);
   registerRealtime(app);
 
