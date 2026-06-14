@@ -25,6 +25,7 @@ Open Source Fleet & Asset Intelligence Platform — a self-hostable Traccar alte
 ### Agent Change Log
 <!-- Agents log their changes here with date/description -->
 - 2026-06-14 — Device approval flow: `approved` column/flag, unapproved devices hidden from map, Settings → Devices shows "Devices Awaiting Approval" with Add button
+- 2026-06-14 — NMEA/GPRMC protocol parser + TCP server on port 5100
 - 2026-06-14 — Custom site name and logo upload in General settings
 - 2026-06-14 — Settings sidebar, user management (create/list/delete), device trip detection toggle, logout button
 - 2026-06-14 — JWT auth with login/register page, protected routes, token management
@@ -178,39 +179,40 @@ Frontend has its own types in `app/src/types/index.ts` (older/separate — consi
 - [x] Server: Server-side reverse geocoding via Nominatim for trip addresses
 - [x] Server: Geocoded addresses saved to trips table at detection time
 - [x] Server: Port 5055 listener for Traccar Client compatibility
+- [x] Server: NMEA/GPRMC protocol parser + TCP server on port 5100
 - [x] Infrastructure: Docker Compose (PostGIS, MinIO, Redis)
 - [x] Infrastructure: .gitignore (node_modules, dist, .env, *.log)
 
 ## Next Steps (Priority Order)
 
-### 1. Server polish
-- [ ] Fix TypeScript strict mode issues (implicit any, etc.)
-- [ ] Add error handling middleware
-- [ ] Add request logging / request IDs
-- [ ] Add pagination to list endpoints
-
-### 2. More protocol parsers
+### 1. More protocol parsers
 - [ ] NMEA/GPRMC parser (standard GPS sentence format)
 - [ ] TK103 protocol parser (Chinese GPS trackers)
-- [ ] Teltonika protocol parser (#1 protocol globally)
-- [ ] gt06 protocol parser (Concox, second most common)
+- [ ] Teltonika protocol parser (#1 protocol globally, 84+ device models)
+- [ ] gt06 protocol parser (Concox, second most common, 83+ models)
 - [ ] OBD-II ELM327 parser (vehicle telemetry)
 - [ ] Document protocol plugin interface
 
-### 3. Trip detection improvement
-- [ ] Add ignition-based trip detection
-- [ ] Add geofence-based trip start/end
-- [x] Save geocoded addresses back to trips table
-
-### 4. API completeness
+### 2. API completeness
 - [ ] Geofences CRUD API
 - [ ] Events API
 - [ ] Maintenance API
 - [ ] Fuel entries API
 
-### 5. Frontend polish
+### 3. Frontend polish
 - [ ] Fuel/Maint panels wired to real data
 - [ ] Dark/light theme toggle
+
+### 4. Server polish
+- [ ] Fix TypeScript strict mode issues (implicit any, etc.)
+- [ ] Add error handling middleware
+- [ ] Add request logging / request IDs
+- [ ] Add pagination to list endpoints
+
+### 5. Trip detection improvement
+- [ ] Add ignition-based trip detection
+- [ ] Add geofence-based trip start/end
+- [x] Save geocoded addresses back to trips table
 
 ### 6. Infrastructure
 - [ ] Dockerize the server

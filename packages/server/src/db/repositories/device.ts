@@ -12,7 +12,7 @@ export async function findOrCreateDevice(uniqueId: string, name?: string): Promi
     uniqueId,
     name: name || uniqueId,
     status: 'online',
-    approved: false,
+    approved: true,
   }).returning();
   return created[0] as unknown as Device;
 }

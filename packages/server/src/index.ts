@@ -10,6 +10,7 @@ import { registerAuthRoutes } from './auth/index.js';
 import { registerUserRoutes } from './api/routes/users.js';
 import { registerStatsRoutes } from './api/routes/stats.js';
 import { registerRealtime } from './realtime/index.js';
+import { startTcpServer } from './ingestion/tcp-server.js';
 import { getPool } from './db/connection.js';
 
 async function main() {
@@ -63,6 +64,13 @@ async function main() {
     console.log(`Traccar-compatible endpoint on http://${config.host}:5055`);
   } catch (err) {
     app.log.warn(`Could not bind port 5055 (${(err as Error).message}) — skipping`);
+  }
+
+  // Start NMEA TCP server for standard GPS receivers
+  try {
+    startTcpServer(5100);
+  } catch (err) {
+    app.log.warn(`Could not start NMEA TCP server (${(err as Error).message}) — skipping`);
   }
 }
 
