@@ -26,6 +26,7 @@ Open Source Fleet & Asset Intelligence Platform — a self-hostable Traccar alte
 
 ### Agent Change Log
 <!-- Agents log their changes here with date/description -->
+- 2026-06-14 — Error handling middleware (AppError class + global error handler), removed redundant try/catch from all routes
 - 2026-06-14 — Fix TypeScript strict mode: eliminated all `any` types across server codebase
 - 2026-06-14 — Color themes (Emerald, Violet, Rose, Amber) + Personal tab in Settings with theme picker
 - 2026-06-14 — Dark/light theme toggle (sun/moon icon in Topbar), light mode CSS variables, persisted to localStorage
@@ -220,7 +221,7 @@ Frontend has its own types in `app/src/types/index.ts` (older/separate — consi
 
 ### 4. Server polish
 - [x] Fix TypeScript strict mode issues (implicit any, etc.)
-- [ ] Add error handling middleware
+- [x] Add error handling middleware
 - [ ] Add request logging / request IDs
 - [ ] Add pagination to list endpoints
 
@@ -234,6 +235,30 @@ Frontend has its own types in `app/src/types/index.ts` (older/separate — consi
 - [ ] Dockerize the frontend
 - [ ] Add CI/CD pipeline
 - [ ] Add Helm chart for Kubernetes deployment
+
+### 7. Multi-Tenant (branch: `multi-tenant`)
+
+**Architecture:** Schema-per-tenant — each customer gets an isolated PostgreSQL schema.
+
+**New tables (public schema):**
+- `tenants` — id, name, slug, schema_name, created_at
+- `tenant_users` — id, tenant_id, email, name, password_hash, role, created_at
+
+**Schema routing:**
+- Detect tenant from subdomain (`abc.fleetoss.phnet.xyz` → `tenant_abc`) or request header
+- Fastify `onRequest` hook: parse tenant → `SET search_path TO tenant_abc;`
+- All Drizzle queries automatically resolve to the correct schema
+
+**Connection layer:**
+- `getDb()` uses the pool with `search_path` set per-request
+- `packages/server/src/db/create-tenant.ts` — creates schema + runs DDL + seeds admin user
+
+**Auth changes:**
+- Login accepts tenant slug → scopes session to that tenant
+- JWT includes `tenant` claim
+- Registration creates tenant → schema → admin user
+
+**Isolation:** No shared data between tenants. Schema-level backups. Independent migration versions.
 
 ## Coding Conventions
 
