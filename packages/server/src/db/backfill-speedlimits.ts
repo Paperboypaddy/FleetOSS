@@ -37,9 +37,10 @@ async function backfillSpeedLimits() {
           [cell.lat, cell.lng]
         );
         console.log(`  [${done}/${cells.rows.length}] ${lat},${lng} → ${result.speed ?? 'N/A'} mph (${result.source}) — ${cnt.rows[0].count} positions`);
-      } catch (e: any) {
+      } catch (e: unknown) {
         errors++;
-        console.log(`  [ERR ${errors}] ${lat},${lng} — ${e.message?.slice(0, 40) || 'unknown'}`);
+        const msg = e instanceof Error ? e.message : 'unknown';
+        console.log(`  [ERR ${errors}] ${lat},${lng} — ${msg.slice(0, 40)}`);
         await new Promise(r => setTimeout(r, 2000));
       }
     }

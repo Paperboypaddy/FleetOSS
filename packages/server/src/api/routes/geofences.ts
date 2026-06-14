@@ -17,14 +17,14 @@ export function registerGeofenceRoutes(app: FastifyInstance) {
     return reply.send(result[0]);
   });
 
-  app.post('/api/geofences', async (request, reply) => {
+  app.post<{ Body: { name?: string; type?: string; latitude?: number; longitude?: number; radius?: number; polygon?: unknown; polyline?: unknown; attributes?: Record<string, unknown> } }>('/api/geofences', async (request, reply) => {
     try {
       const db = getDb();
-      const body = request.body as any;
+      const body = request.body;
       if (!body.name || !body.type) return reply.code(400).send({ error: 'Name and type required' });
       const result = await db.insert(geofences).values({
         name: body.name,
-        type: body.type,
+        type: body.type as 'circle' | 'polygon' | 'polyline',
         latitude: body.latitude,
         longitude: body.longitude,
         radius: body.radius,
@@ -33,21 +33,21 @@ export function registerGeofenceRoutes(app: FastifyInstance) {
         attributes: body.attributes || {},
       }).returning();
       return reply.code(201).send(result[0]);
-    } catch (err: any) {
+    } catch (err: unknown) {
       request.log.error(err, 'Failed to create geofence');
       return reply.code(500).send({ error: 'Internal server error' });
     }
   });
 
-  app.patch<{ Params: { id: string } }>('/api/geofences/:id', async (request, reply) => {
+  app.patch<{ Params: { id: string }; Body: Record<string, unknown> }>('/api/geofences/:id', async (request, reply) => {
     try {
       const db = getDb();
-      const body = request.body as any;
+      const body = request.body;
       const existing = await db.select().from(geofences).where(eq(geofences.id, request.params.id)).limit(1);
       if (!existing.length) return reply.code(404).send({ error: 'Not found' });
       const result = await db.update(geofences).set(body).where(eq(geofences.id, request.params.id)).returning();
       return reply.send(result[0]);
-    } catch (err: any) {
+    } catch (err: unknown) {
       request.log.error(err, 'Failed to update geofence');
       return reply.code(500).send({ error: 'Internal server error' });
     }
@@ -58,7 +58,7 @@ export function registerGeofenceRoutes(app: FastifyInstance) {
       const db = getDb();
       await db.delete(geofences).where(eq(geofences.id, request.params.id));
       return reply.code(204).send();
-    } catch (err: any) {
+    } catch (err: unknown) {
       request.log.error(err, 'Failed to delete geofence');
       return reply.code(500).send({ error: 'Internal server error' });
     }
