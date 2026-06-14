@@ -27,6 +27,7 @@
     "zod": "^3.24.0"
   },
   "devDependencies": {
+    "@types/ldapjs": "^3.0.6",
     "@types/node": "^22.0.0",
     "@types/pg": "^8.11.0",
     "@types/ws": "^8.18.1",
