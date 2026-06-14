@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { fetchOSRMRoute } from '../../lib/osm';
-import { buildSpeedProfile, buildCumDist, speedColor, addMins } from '../../lib/math';
+import { buildCumDist, speedColor, addMins } from '../../lib/math';
 import PlaybackBar from './PlaybackBar';
 import DeviceList from './DeviceList';
 import MapInfoCard from './MapInfoCard';
@@ -150,17 +149,27 @@ const MapPanel = forwardRef<MapPanelHandle, MapPanelProps>(function MapPanel({ d
     const t = trip;
     if (!t || !wpts || wpts.length < 2) return;
 
-    const route = await fetchOSRMRoute(wpts);
-    if (!route) return;
+    // Downsample to ~200 points max for performance
+    let coords = wpts;
+    if (coords.length > 200) {
+      const step = coords.length / 200;
+      coords = Array.from({ length: 200 }, (_, i) => coords[Math.min(Math.floor(i * step), coords.length - 1)]);
+    }
 
-    const coords = route.geometry.coordinates.map((c: number[]) => [c[1], c[0]] as [number, number]);
-    const speeds = buildSpeedProfile(coords, t);
+    const totalDur = t.durationSec;
     const cumDist = buildCumDist(coords);
-    const totalDur = route.duration;
+    // Build speed profile: use actual trip avg/max with simulated curve
+    const speeds = coords.map((_, i) => {
+      const pct = i / Math.max(coords.length - 1, 1);
+      if (pct < 0.15) return Math.round(t.avg * (pct / 0.15));
+      if (pct < 0.4) return Math.round(t.avg + (t.max - t.avg) * ((pct - 0.15) / 0.25));
+      if (pct < 0.65) return Math.round(t.max - (t.max - t.avg) * ((pct - 0.4) / 0.25));
+      return Math.round(t.avg * (1 - (pct - 0.65) / 0.35));
+    });
 
     const newPb: PlaybackState = {
       active: true, playing: false,
-      route, coords, speeds, totalDur, currentSec: 0, speed: 5,
+      route: null, coords, speeds, totalDur, currentSec: 0, speed: 5,
       rafId: null, lastTs: null, tripData: t, cumDist,
       fullLine: null, doneLine: null, vehicleMarker: null, startMarker: null, endMarker: null, segLayers: [],
     };

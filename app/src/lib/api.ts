@@ -94,6 +94,7 @@ export interface FrontendTrip {
   to: string
   dist: number
   dur: string
+  durationSec: number
   avg: number
   max: number
   startSpeed: number
@@ -144,6 +145,7 @@ function mapTrip(api: ApiTrip, deviceName: string): FrontendTrip {
     to: api.endAddress || `${api.endLat.toFixed(4)}, ${api.endLng.toFixed(4)}`,
     dist: Math.round(api.distance * 10) / 10,
     dur: durStr,
+    durationSec: durSec,
     avg: Math.round(api.avgSpeed),
     max: Math.round(api.maxSpeed),
     startSpeed: 0,
