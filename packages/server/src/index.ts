@@ -16,6 +16,7 @@ import { registerFuelRoutes } from './api/routes/fuel.js';
 import { registerAuthProviderRoutes } from './api/routes/auth-providers.js';
 import { registerApiKeyRoutes } from './api/routes/api-keys.js';
 import { registerGroupRoutes } from './api/routes/groups.js';
+import { registerAdminRoutes } from './api/routes/admin.js';
 import { registerSpeedLimitRoutes } from './api/routes/speedlimits.js';
 import { registerStatsRoutes } from './api/routes/stats.js';
 import { registerErrorHandler } from './api/errors.js';
@@ -83,6 +84,7 @@ async function main() {
   registerAuthProviderRoutes(app);
   registerApiKeyRoutes(app);
   registerGroupRoutes(app);
+  registerAdminRoutes(app);
   registerSpeedLimitRoutes(app);
   registerStatsRoutes(app);
   registerRealtime(app);

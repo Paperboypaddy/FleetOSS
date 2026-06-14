@@ -17,7 +17,7 @@ interface Device {
   plate?: string | null
 }
 
-type SettingsTab = 'general' | 'users' | 'devices' | 'personal' | 'sso' | 'api-keys' | 'groups'
+type SettingsTab = 'general' | 'users' | 'devices' | 'personal' | 'sso' | 'api-keys' | 'groups' | 'actions'
 
 function authFetch(path: string, options: RequestInit = {}) {
   const headers: Record<string, string> = { ...(options.headers as Record<string, string> || {}) }
@@ -155,6 +155,7 @@ export default function SettingsPanel({ showToast, colorTheme, onColorThemeChang
     { id: 'devices', label: 'Devices' },
     { id: 'sso', label: 'SSO' },
     { id: 'groups', label: 'Groups' },
+    { id: 'actions', label: 'Actions' },
   ]
   const isAdmin = user?.role === 'admin'
   const tabs = allTabs.filter(t =>
@@ -566,6 +567,37 @@ export default function SettingsPanel({ showToast, colorTheme, onColorThemeChang
                   })}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+        {tab === 'actions' && (
+          <div className="p-6">
+            <h1 className="text-lg font-semibold mb-1">Actions</h1>
+            <p className="text-xs text-text-muted mb-6">Admin maintenance tasks</p>
+
+            <div className="bg-surface border border-border rounded-lg p-4">
+              <h2 className="text-sm font-semibold mb-2">Trip Log</h2>
+              <p className="text-xs text-text-muted mb-3">Re-run trip detection on all existing position data to catch any missed trips.</p>
+              <button
+                className="px-3.5 py-1.5 rounded-lg bg-cyan text-bg text-xs font-semibold border-none cursor-pointer hover:opacity-85 disabled:opacity-50"
+                onClick={async () => {
+                  const btn = document.activeElement as HTMLButtonElement
+                  btn.disabled = true
+                  btn.textContent = 'Running...'
+                  try {
+                    const res = await authFetch('/api/admin/backfill-trips', { method: 'POST' })
+                    if (res.ok) {
+                      const result = await res.json()
+                      showToast(`Refresh complete — ${result.tripsCreated} trips found`)
+                    } else {
+                      const err = await res.json()
+                      showToast(err.error || 'Failed')
+                    }
+                  } catch { showToast('Failed to refresh trips') }
+                  btn.disabled = false
+                  btn.textContent = 'Refresh Trip Log'
+                }}
+              >Refresh Trip Log</button>
             </div>
           </div>
         )}
