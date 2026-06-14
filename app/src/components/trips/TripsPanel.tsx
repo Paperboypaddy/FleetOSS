@@ -1,15 +1,17 @@
 import { useState } from 'react';
-import { tripsData } from '../../data/mockData';
+import type { FrontendTrip } from '../../lib/api';
 
 interface TripsPanelProps {
   showToast: (msg: string) => void;
   onShowTrip?: (tripIdx: number) => void;
+  trips: FrontendTrip[] | null;
 }
 
-export default function TripsPanel({ showToast, onShowTrip }: TripsPanelProps) {
+export default function TripsPanel({ showToast, onShowTrip, trips: tripsProp }: TripsPanelProps) {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [vehicleFilter, setVehicleFilter] = useState('All Vehicles');
 
+  const tripsData = tripsProp || []
   const filtered = vehicleFilter === 'All Vehicles'
     ? tripsData
     : tripsData.filter(t => t.vehicle === vehicleFilter);
@@ -20,7 +22,7 @@ export default function TripsPanel({ showToast, onShowTrip }: TripsPanelProps) {
   const tripCount = filtered.length;
   const avgMi = tripCount > 0 ? totalMi / tripCount : 0;
 
-  const clickTrip = (trip: typeof tripsData[0]) => {
+  const clickTrip = (trip: FrontendTrip) => {
     const realIdx = tripsData.indexOf(trip);
     setSelectedIdx(realIdx);
     onShowTrip?.(realIdx);
@@ -33,14 +35,9 @@ export default function TripsPanel({ showToast, onShowTrip }: TripsPanelProps) {
           <option>All Vehicles</option>
           {vehicles.map(v => <option key={v}>{v}</option>)}
         </select>
-        <input type="date" className="bg-surface border border-border rounded-lg text-text text-xs px-2.5 py-1.5 outline-none focus:border-cyan" defaultValue="2026-06-01" />
+        <input type="date" className="bg-surface border border-border rounded-lg text-text text-xs px-2.5 py-1.5 outline-none focus:border-cyan" defaultValue={new Date().toISOString().split('T')[0]} />
         <span className="text-xs text-text-muted">→</span>
-        <input type="date" className="bg-surface border border-border rounded-lg text-text text-xs px-2.5 py-1.5 outline-none focus:border-cyan" defaultValue="2026-06-12" />
-        <select className="bg-surface border border-border rounded-lg text-text text-xs px-2.5 py-1.5 outline-none focus:border-cyan">
-          <option>All Types</option>
-          <option>Work</option>
-          <option>Personal</option>
-        </select>
+        <input type="date" className="bg-surface border border-border rounded-lg text-text text-xs px-2.5 py-1.5 outline-none focus:border-cyan" defaultValue={new Date().toISOString().split('T')[0]} />
         <div className="ml-auto flex gap-2">
           <button className="px-3 py-1.5 rounded-lg bg-transparent text-text-dim border border-border text-xs cursor-pointer hover:bg-surface-2 transition-colors" onClick={() => showToast('Exported CSV')}>Export CSV</button>
           <button className="px-3.5 py-1.5 rounded-lg bg-cyan text-bg border-none text-xs font-semibold cursor-pointer hover:opacity-85 transition-opacity" onClick={() => showToast('Trip logger coming soon')}>+ Log Trip</button>
@@ -57,7 +54,7 @@ export default function TripsPanel({ showToast, onShowTrip }: TripsPanelProps) {
             </tr>
           </thead>
           <tbody>
-                          {filtered.map((t, i) => (
+            {filtered.map((t, i) => (
               <tr key={i} onClick={() => clickTrip(t)} className={`border-b border-[rgba(46,54,80,0.5)] cursor-pointer transition-colors hover:bg-surface ${tripsData.indexOf(t) === selectedIdx ? 'bg-[rgba(0,212,255,0.07)] outline outline-1 outline-offset-[-1px] outline-[rgba(0,212,255,0.2)]' : ''}`}>
                 <td className="px-4 py-2.5 text-xs font-mono">{t.date}</td>
                 <td className="px-4 py-2.5 text-xs">{t.vehicle}</td>
@@ -70,6 +67,9 @@ export default function TripsPanel({ showToast, onShowTrip }: TripsPanelProps) {
                 <td className="px-4 py-2.5 text-xs text-text-muted">{t.purpose}</td>
               </tr>
             ))}
+            {filtered.length === 0 && (
+              <tr><td colSpan={9} className="px-4 py-12 text-center text-text-muted text-sm">No trips found. Connect a device and start driving!</td></tr>
+            )}
           </tbody>
         </table>
       </div>

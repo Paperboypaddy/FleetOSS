@@ -1,16 +1,23 @@
 import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { devices, tripsData } from '../../data/mockData';
 import { fetchOSRMRoute } from '../../lib/osm';
 import { buildSpeedProfile, buildCumDist, speedColor, addMins } from '../../lib/math';
 import PlaybackBar from './PlaybackBar';
 import DeviceList from './DeviceList';
 import MapInfoCard from './MapInfoCard';
 import type { PlaybackState } from '../../types';
+import type { FrontendDevice, FrontendTrip } from '../../lib/api';
 
 export interface MapPanelHandle {
   showTripOnMap: (tripIdx: number) => Promise<void>;
+}
+
+interface MapPanelProps {
+  devices: FrontendDevice[] | null;
+  trips: FrontendTrip[] | null;
+  onRenameDevice?: (deviceId: string, newName: string) => void;
+  onDeleteDevice?: (deviceId: string) => void;
 }
 
 function makeVehicleIcon(isMoving: boolean) {
@@ -50,7 +57,14 @@ function makePlaybackVehicleIcon() {
   });
 }
 
-const MapPanel = forwardRef<MapPanelHandle, object>(function MapPanel(_props, ref) {
+function batteryColor(level: number | null): string {
+  if (level === null) return '#64748B'
+  if (level >= 70) return '#10B981'
+  if (level >= 30) return '#F59E0B'
+  return '#EF4444'
+}
+
+const MapPanel = forwardRef<MapPanelHandle, MapPanelProps>(function MapPanel({ devices: devicesProp, trips: tripsProp, onRenameDevice, onDeleteDevice }, ref) {
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const markersRef = useRef<L.Marker[]>([]);
@@ -58,6 +72,9 @@ const MapPanel = forwardRef<MapPanelHandle, object>(function MapPanel(_props, re
   const [pb, setPb] = useState<PlaybackState | null>(null);
   const activeTripLayers = useRef<L.Layer[]>([]);
   const pbDoneLine = useRef<L.Polyline | null>(null);
+
+  const deviceArr = devicesProp || []
+  const tripsArr = tripsProp || []
 
   const clearTripLayers = useCallback(() => {
     activeTripLayers.current.forEach(l => { try { mapRef.current?.removeLayer(l); } catch {} });
@@ -78,28 +95,44 @@ const MapPanel = forwardRef<MapPanelHandle, object>(function MapPanel(_props, re
     }).addTo(map);
     mapRef.current = map;
 
-    devices.forEach((d, i) => {
-      const isMoving = d.status === 'moving';
-      const marker = L.marker(d.latlng, { icon: makeVehicleIcon(isMoving) })
+    return () => {
+      map.remove();
+      mapRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    markersRef.current.forEach(m => map.removeLayer(m));
+    markersRef.current = [];
+
+    const defaultCenter = [47.718, -116.945] as [number, number];
+
+    deviceArr.forEach((d, i) => {
+      const isMoving = d.status === 'moving' || d.speed > 0;
+      const batColor = batteryColor(d.battery);
+      const batText = d.battery !== null ? `${Math.round(d.battery)}%` : 'N/A';
+      const marker = L.marker(d.latlng || defaultCenter, { icon: makeVehicleIcon(isMoving) })
         .addTo(map)
         .bindPopup(
           `<div style="font-weight:600;font-size:13px;margin-bottom:6px">${d.name}</div>
-          <div style="display:flex;justify-content:space-between;gap:14px;margin-bottom:3px;color:#64748B;font-size:11px"><span>Plate</span><span style="font-family:'JetBrains Mono',monospace;color:#E2E8F0">${d.plate}</span></div>
+          <div style="display:flex;justify-content:space-between;gap:14px;margin-bottom:3px;color:#64748B;font-size:11px"><span>ID</span><span style="font-family:'JetBrains Mono',monospace;color:#E2E8F0">${d.plate}</span></div>
           <div style="display:flex;justify-content:space-between;gap:14px;margin-bottom:3px;color:#64748B;font-size:11px"><span>Status</span><span style="color:${isMoving ? '#00D4FF' : '#F59E0B'}">${isMoving ? 'Moving' : 'Stopped'}</span></div>
-          <div style="display:flex;justify-content:space-between;gap:14px;margin-bottom:3px;color:#64748B;font-size:11px"><span>Speed</span><span style="font-family:'JetBrains Mono',monospace;color:#E2E8F0">${d.speed} mph</span></div>
-          <div style="display:flex;justify-content:space-between;gap:14px;margin-bottom:3px;color:#64748B;font-size:11px"><span>ODO</span><span style="font-family:'JetBrains Mono',monospace;color:#E2E8F0">${d.odo.toLocaleString()} mi</span></div>
-          <div style="display:flex;justify-content:space-between;gap:14px;margin-bottom:3px;color:#64748B;font-size:11px"><span>Today</span><span style="font-family:'JetBrains Mono',monospace;color:#E2E8F0">${d.today} mi</span></div>`,
+          <div style="display:flex;justify-content:space-between;gap:14px;margin-bottom:3px;color:#64748B;font-size:11px"><span>Speed</span><span style="font-family:'JetBrains Mono',monospace;color:#E2E8F0">${d.speed.toFixed(1)} mph</span></div>
+          <div style="display:flex;justify-content:space-between;gap:14px;color:#64748B;font-size:11px"><span>Battery</span><span style="font-family:'JetBrains Mono',monospace;color:${batColor}">${batText}</span></div>`,
           { maxWidth: 220 },
         );
       marker.on('click', () => setSelectedDevice(i));
       markersRef.current.push(marker);
     });
 
-    return () => {
-      map.remove();
-      mapRef.current = null;
-    };
-  }, []);
+    if (!deviceArr.length && !markersRef.current.length) {
+      const defaultMarker = L.marker(defaultCenter, { icon: makeVehicleIcon(false) }).addTo(map);
+      markersRef.current.push(defaultMarker);
+    }
+  }, [deviceArr]);
 
   const pbSeek = useCallback((sec: number) => {
     setPb(prev => {
@@ -111,8 +144,8 @@ const MapPanel = forwardRef<MapPanelHandle, object>(function MapPanel(_props, re
   const showTripOnMap = useCallback(async (tripIdx: number) => {
     clearTripLayers();
     setPb(null);
-    const t = tripsData[tripIdx];
-    if (!t || !t.waypoints) return;
+    const t = tripsArr[tripIdx];
+    if (!t || !t.waypoints || t.waypoints.length < 2) return;
 
     const route = await fetchOSRMRoute(t.waypoints);
     if (!route) return;
@@ -176,12 +209,13 @@ const MapPanel = forwardRef<MapPanelHandle, object>(function MapPanel(_props, re
 
     map.fitBounds(L.latLngBounds(coords), { padding: [40, 100], maxZoom: 14 });
     setPb(newPb);
-  }, [clearTripLayers, pbSeek]);
+  }, [clearTripLayers, pbSeek, tripsArr]);
 
   useImperativeHandle(ref, () => ({ showTripOnMap }), [showTripOnMap]);
 
   const selectDevice = useCallback((i: number) => {
-    const d = devices[i];
+    const d = deviceArr[i];
+    if (!d) return;
     setSelectedDevice(i);
     clearTripLayers();
     setPb(null);
@@ -189,26 +223,22 @@ const MapPanel = forwardRef<MapPanelHandle, object>(function MapPanel(_props, re
       mapRef.current.flyTo(d.latlng, 13, { duration: 1.2 });
       markersRef.current[i]?.openPopup();
     }
-  }, [clearTripLayers]);
+  }, [clearTripLayers, deviceArr]);
 
   const infoCard = (() => {
     if (!pb || !pb.tripData) {
-      const d = devices[selectedDevice];
+      const d = deviceArr[selectedDevice] || { speed: 0, battery: null };
       return {
-        speed: d.speed ? `${d.speed} mph` : '0 mph',
-        odo: `${d.odo.toLocaleString()} mi`,
-        today: `${d.today} mi`,
-        engine: d.engine,
-        engineColor: d.engine === 'Running' ? '#10B981' : '#64748B',
+        speed: d.speed ? `${d.speed.toFixed(1)} mph` : '0 mph',
+        battery: d.battery !== null ? `${Math.round(d.battery)}%` : 'N/A',
+        batteryColor: batteryColor(d.battery),
       };
     }
     const t = pb.tripData;
     return {
       speed: `${t.avg} mph avg`,
-      odo: `${t.dist} mi`,
-      today: t.dur,
-      engine: `${t.from} → ${t.to}`,
-      engineColor: '#00D4FF',
+      battery: t.dur,
+      batteryColor: '#00D4FF',
     };
   })();
 
@@ -219,7 +249,13 @@ const MapPanel = forwardRef<MapPanelHandle, object>(function MapPanel(_props, re
         <PlaybackBar pb={pb} onSeek={pbSeek} />
         <MapInfoCard {...infoCard} />
       </div>
-      <DeviceList devices={devices} selected={selectedDevice} onSelect={selectDevice} />
+      <DeviceList
+        devices={deviceArr}
+        selected={selectedDevice}
+        onSelect={selectDevice}
+        onRename={onRenameDevice}
+        onDelete={onDeleteDevice}
+      />
     </div>
   );
 });

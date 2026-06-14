@@ -31,3 +31,17 @@ export async function getDeviceById(id: string): Promise<Device | null> {
   const result = await db.select().from(devices).where(eq(devices.id, id)).limit(1);
   return (result[0] as unknown as Device) || null;
 }
+
+export async function updateDeviceName(deviceId: string, name: string): Promise<Device> {
+  const db = getDb();
+  const result = await db.update(devices)
+    .set({ name, updatedAt: new Date() })
+    .where(eq(devices.id, deviceId))
+    .returning();
+  return result[0] as unknown as Device;
+}
+
+export async function deleteDeviceById(deviceId: string): Promise<void> {
+  const db = getDb();
+  await db.delete(devices).where(eq(devices.id, deviceId));
+}

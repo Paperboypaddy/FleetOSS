@@ -1,4 +1,4 @@
-import { desc, eq } from 'drizzle-orm';
+import { desc, eq, and, gte, lte } from 'drizzle-orm';
 import { getDb } from '../connection.js';
 import { positions } from '../schema.js';
 import type { Position, IngestedPosition } from '@fleetoss/core';
@@ -37,14 +37,14 @@ export async function getLatestPosition(deviceId: string): Promise<Position | nu
   return (result[0] as unknown as Position) || null;
 }
 
-export async function getPositions(deviceId: string, from: Date, to: Date, limit = 1000): Promise<Position[]> {
+export async function getPositions(deviceId: string, from?: Date, to?: Date, limit = 1000): Promise<Position[]> {
   const db = getDb();
+  const conditions = [eq(positions.deviceId, deviceId)];
+  if (from) conditions.push(gte(positions.deviceTimestamp, from));
+  if (to) conditions.push(lte(positions.deviceTimestamp, to));
   return db.select()
     .from(positions)
-    .where(
-      // We use manual SQL for the between clause since drizzle-orm handles it differently
-      eq(positions.deviceId, deviceId),
-    )
+    .where(and(...conditions))
     .orderBy(desc(positions.deviceTimestamp))
     .limit(limit) as unknown as Position[];
 }
