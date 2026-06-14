@@ -1,0 +1,16 @@
+{
+  "name": "fleetoss",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w packages/server",
+    "build": "npm run build -w packages/core && npm run build -w packages/server",
+    "db:migrate": "npm run db:migrate -w packages/server",
+    "lint": "tsc --noEmit -p packages/server/tsconfig.json"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
