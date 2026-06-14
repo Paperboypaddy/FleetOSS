@@ -1,6 +1,8 @@
 import type { Position } from '@fleetoss/core';
 import { getDb } from '../db/connection.js';
 import { trips } from '../db/schema.js';
+import { eq } from 'drizzle-orm';
+import { reverseGeocode } from './geocode.js';
 
 const MOVING_SPEED_THRESHOLD = 2; // mph
 const STOP_DURATION_THRESHOLD = 300; // 5 minutes
@@ -78,7 +80,7 @@ export async function detectTrip(deviceId: string, position: Position) {
 
         if (duration >= 30 && state.totalDistance > 0.1) {
           const db = getDb();
-          await db.insert(trips).values({
+          const inserted = await db.insert(trips).values({
             deviceId,
             startPositionId: state.startPosition.id,
             endPositionId: position.id,
@@ -92,7 +94,18 @@ export async function detectTrip(deviceId: string, position: Position) {
             duration: Math.round(duration),
             avgSpeed: state.totalDistance / (duration / 3600),
             maxSpeed: state.maxSpeed,
-          });
+          }).returning();
+
+          // Geocode start/end addresses asynchronously
+          if (inserted.length) {
+            const tripId = inserted[0].id;
+            reverseGeocode(state.startPosition.latitude, state.startPosition.longitude).then(addr => {
+              if (addr) db.update(trips).set({ startAddress: addr }).where(eq(trips.id, tripId)).execute();
+            }).catch(() => {});
+            reverseGeocode(position.latitude, position.longitude).then(addr => {
+              if (addr) db.update(trips).set({ endAddress: addr }).where(eq(trips.id, tripId)).execute();
+            }).catch(() => {});
+          }
         }
 
         deviceState.delete(deviceId);

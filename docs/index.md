@@ -1,8 +1,6 @@
 # FleetOSS Documentation
 
-> Open Source Fleet & Asset Intelligence Platform
-
-Welcome to the FleetOSS documentation. This is a self-hostable alternative to Traccar for tracking vehicles, equipment, and other GPS-enabled assets.
+> Open Source Fleet & Asset Intelligence Platform — a self-hostable Traccar alternative.
 
 ## Quick Links
 
@@ -11,12 +9,9 @@ Welcome to the FleetOSS documentation. This is a self-hostable alternative to Tr
 
 ### Frontend
 - [Frontend Overview](frontend/overview.md)
-- [Component Reference](frontend/components.md)
-- [Data Flow & State](frontend/data-flow.md)
 
 ### Backend
 - [Backend Overview](backend/overview.md)
-- [Database Schema](backend/database.md)
 - [GPS Ingestion System](backend/ingestion.md)
 - [API Reference](backend/api.md)
 - [WebSocket & Real-Time](backend/realtime.md)
@@ -28,15 +23,53 @@ Welcome to the FleetOSS documentation. This is a self-hostable alternative to Tr
 ```
 fleetoss/
 ├── app/                    # React SPA dashboard
+│   ├── src/
+│   │   ├── App.tsx              # Shell + panel routing
+│   │   ├── components/
+│   │   │   ├── layout/          # Sidebar, Topbar
+│   │   │   ├── map/             # Map, playback, device list
+│   │   │   ├── trips/           # Trip table + editing
+│   │   │   ├── maint/           # Maintenance panel
+│   │   │   ├── fuel/            # Fuel tracking
+│   │   │   ├── settings/        # Admin/server stats
+│   │   │   └── ui/              # Icons, Toast
+│   │   ├── lib/
+│   │   │   ├── api.ts           # REST + WebSocket client
+│   │   │   ├── math.ts          # Haversine, etc.
+│   │   │   └── osm.ts           # OSRM routing
+│   │   └── data/mockData.ts     # Fallback data
+│   └── vite.config.ts           # Vite + Tailwind + API proxy
 ├── packages/
-│   ├── core/               # Shared TypeScript types
-│   └── server/             # Fastify API server
-├── docs/                   # This documentation
-├── docker-compose.yml      # Dev infrastructure
-├── AGENTS.md               # AI agent project guide
-└── fleet-tracker.html      # Original prototype (reference only)
+│   ├── core/                    # Shared TS types
+│   │   └── src/index.ts
+│   └── server/                  # Fastify backend
+│       └── src/
+│           ├── index.ts         # Entry (dual-port: 4000 + 5055)
+│           ├── config/          # Environment config
+│           ├── db/              # Schema, migrations, repos
+│           ├── ingestion/       # Protocol parsers
+│           │   └── protocols/   # http-json, traccar
+│           ├── api/routes/      # REST endpoints
+│           ├── realtime/        # WebSocket broadcasting
+│           └── core/            # Trip detection, geocoding
+├── docker-compose.yml           # PostGIS, MinIO, Redis
+└── fleet-tracker.html           # Original prototype (reference only)
 ```
 
-**Stack:** React 19 + Vite 8 + Tailwind CSS v4 (frontend) · Fastify 5 + Drizzle ORM + PostgreSQL/PostGIS (backend) · TypeScript throughout
+## Quick Start
 
-**Original prototype:** `fleet-tracker.html` is a single-file HTML/JS proof-of-concept kept unmodified. The `app/` directory is the rebuilt version.
+```bash
+# Start infrastructure
+docker compose up -d
+
+# Install dependencies & setup DB
+npm install
+cp packages/server/.env.example packages/server/.env
+npm run db:migrate
+
+# Start backend (port 4000 + 5055)
+npm run dev
+
+# Start frontend (separate terminal, port 5173)
+cd app && npm run dev
+```

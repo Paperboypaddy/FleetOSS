@@ -1,4 +1,5 @@
 import { getPool } from './connection.js';
+import { reverseGeocode } from '../core/geocode.js';
 
 const MOVING_THRESHOLD = 2 // mph
 const STOP_GAP_SECONDS = 300 // 5 minutes — same as live trip detector
@@ -85,17 +86,28 @@ async function saveTrip(client: any, deviceId: string, tripPositions: any[]) {
   const duration = (new Date(last.device_timestamp).getTime() - new Date(first.device_timestamp).getTime()) / 1000;
 
   if (duration >= 30 && distance > 0.1) {
-    await client.query(`
+    const result = await client.query(`
       INSERT INTO trips (device_id, start_position_id, end_position_id, start_time, end_time,
         start_lat, start_lng, end_lat, end_lng, distance, duration, avg_speed, max_speed)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      RETURNING id
     `, [
       deviceId, first.id, last.id,
       first.device_timestamp, last.device_timestamp,
       first.latitude, first.longitude, last.latitude, last.longitude,
       distance, Math.round(duration), distance / (duration / 3600), maxSpeed,
     ]);
+    const tripId = result.rows[0]?.id;
     console.log(`  Trip: ${distance.toFixed(1)} mi over ${Math.round(duration)}s (avg ${(distance / (duration / 3600)).toFixed(0)} mph, max ${maxSpeed} mph)`);
+
+    // Geocode start/end synchronously
+    if (tripId) {
+      const startAddr = await reverseGeocode(first.latitude, first.longitude);
+      if (startAddr) await client.query('UPDATE trips SET start_address = $1 WHERE id = $2', [startAddr, tripId]);
+      await new Promise(r => setTimeout(r, 200)); // Nominatim rate limit
+      const endAddr = await reverseGeocode(last.latitude, last.longitude);
+      if (endAddr) await client.query('UPDATE trips SET end_address = $1 WHERE id = $2', [endAddr, tripId]);
+    }
   }
 }
 

@@ -223,25 +223,7 @@ export async function fetchTrips(): Promise<FrontendTrip[]> {
     const deviceRes = await fetch(`${API}/devices`)
     const devices: ApiDevice[] = deviceRes.ok ? await deviceRes.json() : []
     const nameMap = new Map(devices.map(d => [d.id, d.name]))
-    const trips = data.map(t => mapTrip(t, nameMap.get(t.deviceId) || t.deviceId))
-
-    // Auto-geocode start/end addresses (only if they're just coordinates)
-    for (const trip of trips) {
-      const startIsCoord = /^-?[\d.]+,\s*-?[\d.]+$/.test(trip.from.trim())
-      const endIsCoord = /^-?[\d.]+,\s*-?[\d.]+$/.test(trip.to.trim())
-      if (startIsCoord) {
-        const addr = await reverseGeocode(trip.waypoints[0][0], trip.waypoints[0][1])
-        if (addr) trip.from = addr
-      }
-      if (endIsCoord) {
-        const addr = await reverseGeocode(trip.waypoints[1][0], trip.waypoints[1][1])
-        if (addr) trip.to = addr
-      }
-      // Small delay to respect Nominatim rate limits
-      if (startIsCoord || endIsCoord) await new Promise(r => setTimeout(r, 200))
-    }
-
-    return trips
+    return data.map(t => mapTrip(t, nameMap.get(t.deviceId) || t.deviceId))
   } catch (err) {
     console.warn('Failed to fetch trips, using mock data fallback', err)
     const { tripsData } = await import('../data/mockData')
