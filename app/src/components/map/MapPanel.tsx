@@ -101,7 +101,7 @@ const MAP_STYLES: MapStyleDef[] = [
 
 type MapStyleId = MapStyleDef['id']
 
-const MapPanel = forwardRef<MapPanelHandle, MapPanelProps>(function MapPanel({ devices: devicesProp, trips: tripsProp, onRenameDevice, onDeleteDevice }, ref) {
+const MapPanel = forwardRef<MapPanelHandle, MapPanelProps>(function MapPanel({ devices: devicesProp, onRenameDevice, onDeleteDevice }, ref) {
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const markersRef = useRef<L.Marker[]>([]);
