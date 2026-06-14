@@ -8,7 +8,7 @@ import MaintPanel from './components/maint/MaintPanel';
 import FuelPanel from './components/fuel/FuelPanel';
 import Toast from './components/ui/Toast';
 import type { PanelId } from './types';
-import { fetchDevices, fetchTrips, connectWebSocket, renameDevice, deleteDevice } from './lib/api';
+import { fetchDevices, fetchTrips, connectWebSocket, renameDevice, deleteDevice, fetchTripPositions } from './lib/api';
 import type { FrontendDevice, FrontendTrip, ApiPosition } from './lib/api';
 
 export default function App() {
@@ -48,10 +48,11 @@ export default function App() {
     setToastMsg(msg)
   }, [])
 
-  const handleShowTrip = useCallback(async (tripIdx: number) => {
+  const handleShowTrip = useCallback(async (trip: FrontendTrip) => {
     setActivePanel('map')
+    const waypoints = await fetchTripPositions(trip.deviceId, trip.startTimeIso, trip.endTimeIso)
     await new Promise(r => setTimeout(r, 100))
-    mapRef.current?.showTripOnMap(tripIdx)
+    mapRef.current?.showTripOnMap(trip, waypoints.length >= 2 ? waypoints : trip.waypoints)
   }, [])
 
   const handleRenameDevice = useCallback(async (deviceId: string, newName: string) => {

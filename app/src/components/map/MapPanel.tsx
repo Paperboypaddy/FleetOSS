@@ -11,7 +11,7 @@ import type { FrontendDevice, FrontendTrip } from '../../lib/api';
 import { timeAgo } from '../../lib/api';
 
 export interface MapPanelHandle {
-  showTripOnMap: (tripIdx: number) => Promise<void>;
+  showTripOnMap: (trip: FrontendTrip, waypoints: [number, number][]) => Promise<void>;
 }
 
 interface MapPanelProps {
@@ -144,13 +144,13 @@ const MapPanel = forwardRef<MapPanelHandle, MapPanelProps>(function MapPanel({ d
     });
   }, []);
 
-  const showTripOnMap = useCallback(async (tripIdx: number) => {
+  const showTripOnMap = useCallback(async (trip: FrontendTrip, wpts: [number, number][]) => {
     clearTripLayers();
     setPb(null);
-    const t = tripsArr[tripIdx];
-    if (!t || !t.waypoints || t.waypoints.length < 2) return;
+    const t = trip;
+    if (!t || !wpts || wpts.length < 2) return;
 
-    const route = await fetchOSRMRoute(t.waypoints);
+    const route = await fetchOSRMRoute(wpts);
     if (!route) return;
 
     const coords = route.geometry.coordinates.map((c: number[]) => [c[1], c[0]] as [number, number]);
@@ -212,7 +212,7 @@ const MapPanel = forwardRef<MapPanelHandle, MapPanelProps>(function MapPanel({ d
 
     map.fitBounds(L.latLngBounds(coords), { padding: [40, 100], maxZoom: 14 });
     setPb(newPb);
-  }, [clearTripLayers, pbSeek, tripsArr]);
+  }, [clearTripLayers, pbSeek]);
 
   useImperativeHandle(ref, () => ({ showTripOnMap }), [showTripOnMap]);
 

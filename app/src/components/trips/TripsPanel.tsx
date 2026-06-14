@@ -3,7 +3,7 @@ import type { FrontendTrip } from '../../lib/api';
 
 interface TripsPanelProps {
   showToast: (msg: string) => void;
-  onShowTrip?: (tripIdx: number) => void;
+  onShowTrip?: (trip: FrontendTrip) => void;
   trips: FrontendTrip[] | null;
 }
 
@@ -25,7 +25,7 @@ export default function TripsPanel({ showToast, onShowTrip, trips: tripsProp }: 
   const clickTrip = (trip: FrontendTrip) => {
     const realIdx = tripsData.indexOf(trip);
     setSelectedIdx(realIdx);
-    onShowTrip?.(realIdx);
+    onShowTrip?.(trip);
   };
 
   return (

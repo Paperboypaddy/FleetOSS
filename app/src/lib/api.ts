@@ -103,6 +103,9 @@ export interface FrontendTrip {
   purpose: string
   waypoints: [number, number][]
   apiId?: string
+  deviceId: string
+  startTimeIso: string
+  endTimeIso: string
 }
 
 function mapStatus(apiStatus: string): 'moving' | 'stopped' | 'offline' {
@@ -150,6 +153,9 @@ function mapTrip(api: ApiTrip, deviceName: string): FrontendTrip {
     purpose: '',
     waypoints: [[api.startLat, api.startLng], [api.endLat, api.endLng]],
     apiId: api.id,
+    deviceId: api.deviceId,
+    startTimeIso: api.startTime,
+    endTimeIso: api.endTime,
   }
 }
 
@@ -214,6 +220,19 @@ export async function fetchTrips(): Promise<FrontendTrip[]> {
     console.warn('Failed to fetch trips, using mock data fallback', err)
     const { tripsData } = await import('../data/mockData')
     return tripsData
+  }
+}
+
+export async function fetchTripPositions(deviceId: string, from: string, to: string): Promise<[number, number][]> {
+  try {
+    const fromParam = encodeURIComponent(from)
+    const toParam = encodeURIComponent(to)
+    const res = await fetch(`${API}/devices/${deviceId}/positions?from=${fromParam}&to=${toParam}&limit=1000`)
+    if (!res.ok) return []
+    const positions: ApiPosition[] = await res.json()
+    return positions.reverse().map(p => [p.latitude, p.longitude] as [number, number])
+  } catch {
+    return []
   }
 }
 
