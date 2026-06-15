@@ -4,7 +4,7 @@ import type { IngestedPosition } from '@fleetoss/core';
 // Sends data as HTTP GET query params:
 //   ?id=123&lat=47.7&lon=-116.9&speed=34&bearing=180&altitude=700&accuracy=10
 //   &batt=85&timestamp=1718300000&odometer=50000&fuel=50&ignition=true
-// iOS Traccar Client sends speed in m/s — convert to mph
+// OsmAnd/Traccar Client query params send speed in knots by default (configurable) — convert to mph
 
 export interface TraccarParams {
   id: string
@@ -48,8 +48,8 @@ export function parseTraccarParams(params: TraccarParams): IngestedPosition {
   }
 
   if (params.speed !== undefined) {
-    const ms = parseFloat(params.speed)
-    if (!isNaN(ms)) result.speed = Math.round(ms * 2.237 * 100) / 100 // m/s → mph
+    const kts = parseFloat(params.speed)
+    if (!isNaN(kts)) result.speed = Math.round(kts * 1.151 * 100) / 100 // knots → mph
   }
   if (params.bearing !== undefined) {
     result.bearing = parseFloat(params.bearing)

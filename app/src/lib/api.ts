@@ -304,10 +304,20 @@ export async function fetchTripPositions(deviceId: string, from: string, to: str
   try {
     const fromParam = encodeURIComponent(from)
     const toParam = encodeURIComponent(to)
-    const res = await apiFetch(`/devices/${deviceId}/positions?from=${fromParam}&to=${toParam}&limit=5000`)
-    if (!res.ok) return []
-    const positions: ApiPosition[] = await res.json() as ApiPosition[]
-    return positions.reverse().map(p => ({
+    const allPositions: ApiPosition[] = []
+    let page = 1
+    const limit = 1000
+    while (true) {
+      const res = await apiFetch(`/devices/${deviceId}/positions?from=${fromParam}&to=${toParam}&limit=${limit}&page=${page}`)
+      if (!res.ok) break
+      const json = await res.json()
+      const positions: ApiPosition[] = extractData(json)
+      allPositions.push(...positions)
+      if (!json.hasMore || positions.length === 0) break
+      page++
+    }
+    allPositions.sort((a, b) => new Date(a.deviceTimestamp).getTime() - new Date(b.deviceTimestamp).getTime())
+    return allPositions.map(p => ({
       latlng: [p.latitude, p.longitude] as [number, number],
       speed: (p.speed != null && p.speed >= 0) ? Math.round(p.speed) : 0,
       speedLimit: p.speedLimit != null ? p.speedLimit : undefined,
