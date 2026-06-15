@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { FrontendTrip } from '../../lib/api';
 import { updateTrip } from '../../lib/api';
+import { getAuthToken } from '../../lib/auth';
 
 interface TripsPanelProps {
   showToast: (msg: string) => void;
@@ -136,13 +137,26 @@ export default function TripsPanel({ showToast, onShowTrip, trips: tripsProp }: 
                   </span>
                   )}
                 </td>
-                <td className="px-4 py-2.5" onClick={e => e.stopPropagation()}>
-                  <a
-                    href={`/api/trips/${t.apiId}/export`}
-                    download
-                    className="text-cyan-dim text-xs hover:text-cyan transition-colors no-underline"
-                    title="Export CSV"
-                  >⬇</a>
+                <td className="px-4 py-2.5 text-right" onClick={e => e.stopPropagation()}>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const res = await fetch(`/api/trips/${t.apiId}/export`, {
+                          headers: { 'Authorization': `Bearer ${getAuthToken()}` },
+                        })
+                        if (!res.ok) return alert('Download failed')
+                        const blob = await res.blob()
+                        const url = URL.createObjectURL(blob)
+                        const a = document.createElement('a')
+                        a.href = url
+                        a.download = `trip-${t.apiId!.slice(0, 8)}.csv`
+                        a.click()
+                        URL.revokeObjectURL(url)
+                      } catch {}
+                    }}
+                    className="px-2 py-1 rounded bg-cyan text-bg text-[10px] font-semibold border-none cursor-pointer hover:opacity-85 whitespace-nowrap"
+                    title="Download CSV"
+                  >CSV</button>
                 </td>
               </tr>
             ))}
