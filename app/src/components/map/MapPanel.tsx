@@ -157,6 +157,7 @@ const MapPanel = forwardRef<MapPanelHandle, MapPanelProps>(function MapPanel({ d
     mapRef.current = map;
 
     // My Location button
+    // My Location button
     const LocateControl = L.Control.extend({
       onAdd() {
         const btn = document.createElement('button')
@@ -167,18 +168,35 @@ const MapPanel = forwardRef<MapPanelHandle, MapPanelProps>(function MapPanel({ d
         btn.onmouseenter = () => { btn.style.background = '#334155' }
         btn.onmouseleave = () => { btn.style.background = '#1E293B' }
         btn.onclick = () => {
-          if (!map) return
-          map.locate({ setView: true, maxZoom: 15 })
+          if (!navigator.geolocation) {
+            alert('Geolocation is not supported by your browser')
+            return
+          }
+          btn.style.opacity = '0.5'
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              btn.style.opacity = '1'
+              const latlng: [number, number] = [pos.coords.latitude, pos.coords.longitude]
+              map.setView(latlng, 15)
+              L.circleMarker(latlng, { radius: 10, color: '#00D4FF', fillColor: '#00D4FF', fillOpacity: 0.3, weight: 2 }).addTo(map)
+            },
+            (err) => {
+              btn.style.opacity = '1'
+              alert(
+                err.code === err.PERMISSION_DENIED
+                  ? 'Location access denied. Please enable location in your browser settings.'
+                  : err.code === err.TIMEOUT
+                  ? 'Location request timed out. Try again.'
+                  : 'Could not get your location. Try again.'
+              )
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+          )
         }
         return btn
       },
     })
     new LocateControl({ position: 'bottomright' }).addTo(map)
-
-    // Try browser location on load
-    map.on('locationfound', (e: any) => {
-      L.circleMarker(e.latlng, { radius: 8, color: '#00D4FF', fillColor: '#00D4FF', fillOpacity: 0.3, weight: 2 }).addTo(map)
-    })
 
     return () => {
       map.remove();
