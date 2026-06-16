@@ -12,7 +12,8 @@ export function tk103Handler(socket: net.Socket, ingest: (data: IngestedPosition
 
     for (const line of lines) {
       const trimmed = line.trim();
-      if (!trimmed || !trimmed.startsWith('##,')) continue;
+      if (!trimmed) continue;
+      if (!trimmed.startsWith('##,') && !trimmed.startsWith('*HQ,')) continue;
 
       const msg = parseTk103(trimmed);
       if (!msg) continue;

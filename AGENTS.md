@@ -303,7 +303,25 @@ Frontend has its own types in `app/src/types/index.ts` (older/separate — consi
 - [x] WebSocket fan-out (Redis Pub/Sub for multi-instance position broadcasting)
 - [x] Rate limiting (sliding window per-IP on ingestion endpoints, 60 req/min)
 
-### 8. Multi-Tenant (branch: `multi-tenant`)
+### 8. Protocol Auto-Detect & Unified Ingestion
+
+**Goal:** A single TCP listener that auto-detects which protocol a device speaks and routes to the correct parser, rather than requiring per-protocol ports.
+
+**Approach:**
+- Replace per-port TCP handlers (GT06 on 5001, TK103 on 5002, etc.) with a single `ProtocolDetector` that examines the first bytes of data:
+  - Binary protocols: GT06 (0x78/0x79), Teltonika (0x00000000 prefix), Queclink (`+RESP:`)
+  - Text protocols: TK103 (`##,imei:` or `*HQ,`), NMEA (`$GP`), TK102
+- Maintain a log of ALL connections — including unparseable data — for debugging device compatibility
+- Each parsed position should log protocol, device ID, and raw data snippet regardless of parse success
+
+**Files:**
+- `packages/server/src/ingestion/protocol-detector.ts` — reads initial bytes, returns protocol name
+- `packages/server/src/ingestion/handlers/unified-handler.ts` — single entry point for TCP devices
+- Refactor existing per-port handlers to be called by the detector
+
+**Port plan:** Keep port 5001 as unified GPS ingest port. Route 5002/5004/5056/5100 to the same detector for backward compatibility.
+
+### 9. Multi-Tenant (branch: `multi-tenant`)
 
 **Architecture:** Schema-per-tenant — each customer gets an isolated PostgreSQL schema.
 

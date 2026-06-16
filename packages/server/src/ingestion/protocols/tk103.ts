@@ -21,10 +21,54 @@ function parseCoord(value: string, dir: string): number {
 }
 
 // Primary TK103 format: ##,imei:XXXXXX,A/B/C,data...
+// Also handles *HQ,IMEI,Vx,... variant used by some TK103 clones
 export function parseTk103(line: string): Tk103Message | null {
   const trimmed = line.trim()
 
-  // Skip empty or malformed lines
+  // *HQ,IMEI,Vx,... variant format
+  if (trimmed.startsWith('*HQ,')) {
+    const parts = trimmed.split(',')
+    if (parts.length < 3) return null
+    const deviceId = parts[1] // IMEI after *HQ,
+    if (!deviceId || !/^\d+$/.test(deviceId)) return null
+
+    // Check if this contains position data (has lat/lng after time/status)
+    // *HQ,IMEI,Vx,HHMMSS,status,lat,NS,lng,EW,speed,course,DDMMYY,...
+    if (parts.length >= 10) {
+      const latStr = parts[5]
+      const nsDir = parts[6]
+      const lngStr = parts[7]
+      const ewDir = parts[8]
+      const speedKnots = parseFloat(parts[9])
+      const latitude = parseCoord(latStr, nsDir)
+      const longitude = parseCoord(lngStr, ewDir)
+      const speed = isNaN(speedKnots) ? undefined : Math.round(speedKnots * 1.151 * 100) / 100
+
+      let timestamp = new Date().toISOString()
+      const timeStr = parts[3] // HHMMSS
+      const dateStr = parts.length > 11 ? parts[11] : '' // DDMMYY
+      if (dateStr && timeStr && dateStr.length === 6 && timeStr.length === 6) {
+        const d = parseInt(dateStr.slice(0, 2))
+        const mo = parseInt(dateStr.slice(2, 4)) - 1
+        const y = 2000 + parseInt(dateStr.slice(4, 6))
+        const h = parseInt(timeStr.slice(0, 2))
+        const mi = parseInt(timeStr.slice(2, 4))
+        const s = parseInt(timeStr.slice(4, 6))
+        const ts = new Date(Date.UTC(y, mo, d, h, mi, s))
+        if (!isNaN(ts.getTime())) timestamp = ts.toISOString()
+      }
+
+      return {
+        deviceId,
+        type: 'position',
+        data: { latitude, longitude, speed, timestamp },
+      }
+    }
+
+    return { deviceId, type: 'heartbeat', data: null }
+  }
+
+  // Standard ##,imei: format
   if (!trimmed.startsWith('##,')) return null
 
   // Extract IMEI from ##,imei:XXXXXXXXX,
