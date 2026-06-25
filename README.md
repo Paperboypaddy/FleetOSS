@@ -10,6 +10,62 @@ Whether you're an independent contractor with a single van, a small business man
 
 ---
 
+## Quick Start
+
+### Using Docker Compose (recommended)
+
+```bash
+# Clone the repo
+git clone https://github.com/fosrl/fleetoss.git
+cd fleetoss
+
+# Set required secrets
+echo "JWT_SECRET=$(openssl rand -base64 32)" >> .env
+echo "DB_PASSWORD=$(openssl rand -base64 16)" >> .env
+
+# Start with auto SSL (replace with your domain)
+DOMAIN=fleetoss.example.com EMAIL=admin@example.com docker compose -f docker-compose.selfhosted.yml up -d
+
+# Or start without SSL (HTTP on port 80)
+docker compose -f docker-compose.selfhosted.yml up -d
+```
+
+### Using Docker directly
+
+```bash
+# Without SSL (HTTP on :80)
+docker run -d --name fleetoss -p 80:80 -p 5055:5055 \
+  -e DATABASE_URL=postgres://user:pass@host:5432/fleetoss \
+  -e JWT_SECRET=$(openssl rand -base64 32) \
+  ghcr.io/fosrl/fleetoss:latest
+
+# With auto SSL via Let's Encrypt (HTTPS on :443)
+docker run -d --name fleetoss -p 80:80 -p 443:443 -p 5055:5055 \
+  -e DOMAIN=fleetoss.example.com \
+  -e EMAIL=admin@example.com \
+  -e DATABASE_URL=postgres://user:pass@host:5432/fleetoss \
+  -e JWT_SECRET=$(openssl rand -base64 32) \
+  ghcr.io/fosrl/fleetoss:latest
+```
+
+### Environment Variables
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `DATABASE_URL` | Yes | — | PostgreSQL connection string |
+| `JWT_SECRET` | Yes | — | Secret for JWT token signing |
+| `DOMAIN` | No | — | Public domain for auto SSL (Let's Encrypt). Leave empty for HTTP |
+| `EMAIL` | No | — | Email for Let's Encrypt registration. Required if DOMAIN is set |
+| `DB_PASSWORD` | No | `fleetoss_dev` | Postgres password (used in compose only) |
+| `REDIS_URL` | No | — | Redis connection string (optional, for rate limiting) |
+
+### First Run
+
+Open `http://localhost` (or `https://fleetoss.example.com` if using SSL).
+The first user to register becomes the admin.
+
+---
+
 ## Why FleetOSS?
 
 Most fleet management platforms are:

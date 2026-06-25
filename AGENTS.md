@@ -89,6 +89,7 @@ Error responses include `requestId` for debugging:
 - 2026-06-14 — SSO settings panel (frontend CRUD UI for LDAP/OIDC/OAuth2/SAML provider config)
 - 2026-06-14 — Pluggable auth system: LDAP, OIDC, OAuth2, SAML strategies + Keycloak + SSO login page
 - 2026-06-14 — Initialized agent coordination section in AGENTS.md
+- 2026-06-24 — Selfhosted all-in-one Docker image (Dockerfile.selfhosted): Caddy reverse proxy with auto SSL (Let's Encrypt via DOMAIN/EMAIL env vars), serves frontend + proxies API/WebSocket to Node server
 
 ## Architecture
 
@@ -100,6 +101,10 @@ fleetoss/
 ├── packages/
 │   ├── core/               # Shared TypeScript types (frontend + backend)
 │   └── server/             # Backend (Fastify + Drizzle + PostgreSQL/PostGIS)
+├── selfhosted/             # All-in-one Docker image with Caddy + Node
+│   ├── entrypoint.sh       # Starts Caddy (reverse proxy) + Node server
+│   └── Caddyfile           # Caddy config template (auto SSL via Let's Encrypt)
+├── Dockerfile.selfhosted   # Multi-stage build: frontend + server + Caddy
 ├── docker-compose.yml      # PostGIS + MinIO + Redis
 ├── fleet-tracker.html      # Original prototype (keep as reference, not for editing)
 └── AGENTS.md               # This file
@@ -252,6 +257,7 @@ Frontend has its own types in `app/src/types/index.ts` (older/separate — consi
 - [x] Server: Queclink protocol parser + TCP server on port 5004
 - [x] Infrastructure: Docker Compose (PostGIS, MinIO, Redis, Keycloak)
 - [x] Infrastructure: .gitignore (node_modules, dist, .env, *.log)
+- [x] Selfhosted all-in-one Docker image: Caddy reverse proxy with auto SSL (Let's Encrypt via DOMAIN/EMAIL env vars)
 
 ## Next Steps (Priority Order)
 
@@ -373,6 +379,14 @@ npm run dev          # starts server on :4000 (+ :5055 for Traccar)
 
 # Frontend (separate terminal)
 cd app && npm run dev  # starts on :5173
+
+# Selfhosted (all-in-one with auto SSL via Caddy):
+docker compose -f docker-compose.prod.yml up fleetoss-selfhosted -d
+# Or standalone:
+docker run -d --name fleetoss -p 80:80 -p 443:443 -p 4000:4000 \
+  -e DOMAIN=fleetoss.example.com -e EMAIL=admin@example.com \
+  -e DATABASE_URL=postgres://... -e JWT_SECRET=... \
+  ghcr.io/fosrl/fleetoss:latest
 
 # Ingest a test position via Traccar protocol:
 curl "http://localhost:5055/?id=test-001&lat=47.718&lon=-116.945&speed=34"

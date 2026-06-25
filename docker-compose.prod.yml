@@ -80,6 +80,46 @@ services:
     depends_on:
       - server
 
+  # All-in-one selfhosted image (Caddy reverse proxy + Node API + frontend)
+  # Use this instead of server + app if you want auto SSL via Let's Encrypt.
+  # Set DOMAIN to your domain (e.g., fleetoss.example.com) for HTTPS,
+  # and EMAIL for Let's Encrypt registration.
+  #
+  # docker compose -f docker-compose.prod.yml up fleetoss-selfhosted
+  fleetoss-selfhosted:
+    build:
+      context: .
+      dockerfile: Dockerfile.selfhosted
+    container_name: fleetoss-selfhosted
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+      - '4000:4000'
+      - '5055:5055'
+      - '5001:5001'
+      - '5002:5002'
+      - '5004:5004'
+      - '5056:5056'
+      - '5100:5100'
+    environment:
+      DOMAIN: '${DOMAIN:-}'
+      EMAIL: '${EMAIL:-}'
+      PORT: '4000'
+      HOST: '0.0.0.0'
+      DATABASE_URL: postgres://fleetoss:${DB_PASSWORD:-fleetoss_dev}@postgres:5432/fleetoss
+      JWT_SECRET: ${JWT_SECRET}
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: ${MINIO_USER:-fleetoss}
+      S3_SECRET_KEY: ${MINIO_PASSWORD:-fleetoss_dev}
+      S3_BUCKET: ${S3_BUCKET:-fleetoss}
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
 volumes:
   pgdata_prod:
   minio_data_prod:

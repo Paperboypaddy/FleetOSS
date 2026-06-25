@@ -1,0 +1,20 @@
+{
+    admin off
+    email {$EMAIL:}
+}
+
+{$DOMAIN:localhost} {
+    handle /api/* {
+        reverse_proxy localhost:4000
+    }
+
+    handle /ws {
+        reverse_proxy localhost:4000
+    }
+
+    handle {
+        root * /www
+        file_server
+        try_files {path} /index.html
+    }
+}

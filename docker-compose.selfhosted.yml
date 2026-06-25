@@ -1,0 +1,51 @@
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: fleetoss-db
+    restart: unless-stopped
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_DB: fleetoss
+      POSTGRES_USER: fleetoss
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-fleetoss_dev}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U fleetoss']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: fleetoss-cache
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+
+  fleetoss:
+    image: ghcr.io/fosrl/fleetoss:latest
+    container_name: fleetoss
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+      - '5055:5055'
+      - '5001:5001'
+      - '5002:5002'
+      - '5004:5004'
+      - '5056:5056'
+      - '5100:5100'
+    environment:
+      DOMAIN: '${DOMAIN:-}'
+      EMAIL: '${EMAIL:-}'
+      DATABASE_URL: postgres://fleetoss:${DB_PASSWORD:-fleetoss_dev}@postgres:5432/fleetoss
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:

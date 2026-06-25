@@ -1,0 +1,52 @@
+# ─── Stage 1: Build shared types (@fleetoss/core) ───
+FROM node:22-alpine AS core-builder
+WORKDIR /app
+COPY package.json package-lock.json ./
+COPY packages/core/package.json packages/core/
+RUN npm ci
+COPY packages/core packages/core
+RUN npm run build -w packages/core
+
+# ─── Stage 2: Build API server ───
+FROM node:22-alpine AS server-builder
+WORKDIR /app
+COPY package.json package-lock.json ./
+COPY packages/core/package.json packages/core/
+COPY packages/server/package.json packages/server/
+RUN npm ci
+COPY packages/core packages/core
+COPY packages/server packages/server
+COPY --from=core-builder /app/packages/core/dist packages/core/dist
+RUN npm run build -w packages/server
+
+# ─── Stage 3: Build frontend ───
+FROM node:22-alpine AS app-builder
+WORKDIR /app
+COPY app/package.json app/package-lock.json* ./
+RUN npm ci
+COPY app/ ./
+RUN npm run build
+
+# ─── Stage 4: Runtime image ───
+FROM alpine:3.20
+WORKDIR /app
+
+RUN apk add --no-cache nodejs caddy tini
+
+COPY --from=server-builder /app/packages/server/dist ./dist
+COPY --from=server-builder /app/packages/server/package.json ./
+COPY --from=server-builder /app/node_modules ./node_modules
+
+COPY --from=app-builder /app/dist /www
+
+COPY selfhosted/entrypoint.sh /entrypoint.sh
+COPY selfhosted/Caddyfile /etc/caddy/Caddyfile
+
+EXPOSE 80 443 4000 5055
+EXPOSE 5001 5002 5004 5056 5100
+
+ENV DOMAIN=
+ENV EMAIL=
+
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["/entrypoint.sh"]

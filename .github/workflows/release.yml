@@ -52,6 +52,16 @@ jobs:
             ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}/app:${{ steps.version.outputs.VERSION }}
             ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}/app:latest
 
+      - name: Build and push selfhosted image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.selfhosted
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:${{ steps.version.outputs.VERSION }}
+            ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:latest
+
       - name: Generate release notes
         id: notes
         run: |
@@ -63,6 +73,7 @@ jobs:
           echo "### Images" >> /tmp/release.md
           echo "- \`${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}/server:${{ steps.version.outputs.VERSION }}\`" >> /tmp/release.md
           echo "- \`${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}/app:${{ steps.version.outputs.VERSION }}\`" >> /tmp/release.md
+          echo "- \`${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:${{ steps.version.outputs.VERSION }}\` (selfhosted — all-in-one with auto SSL)" >> /tmp/release.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

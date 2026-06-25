@@ -99,3 +99,10 @@ jobs:
           file: app/Dockerfile
           push: true
           tags: ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}/app:latest, ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}/app:${{ github.sha }}
+      - name: Build and push selfhosted image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.selfhosted
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:latest, ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:${{ github.sha }}
