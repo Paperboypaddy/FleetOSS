@@ -8,7 +8,8 @@
     "dev": "npm run dev -w packages/server",
     "build": "npm run build -w packages/core && npm run build -w packages/server",
     "db:migrate": "npm run db:migrate -w packages/server",
-    "lint": "tsc --noEmit -p packages/server/tsconfig.json"
+    "lint": "tsc --noEmit -p packages/server/tsconfig.json",
+    "test": "npm run test -w packages/server && cd app && npx vitest run"
   },
   "engines": {
     "node": ">=20.0.0"
@@ -21,6 +22,7 @@
     "samlify": "^2.13.1"
   },
   "devDependencies": {
-    "@types/jsonwebtoken": "^9.0.10"
+    "@types/jsonwebtoken": "^9.0.10",
+    "vitest": "^4.1.9"
   }
 }

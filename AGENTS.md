@@ -90,6 +90,8 @@ Error responses include `requestId` for debugging:
 - 2026-06-14 — Pluggable auth system: LDAP, OIDC, OAuth2, SAML strategies + Keycloak + SSO login page
 - 2026-06-14 — Initialized agent coordination section in AGENTS.md
 - 2026-06-24 — Selfhosted all-in-one Docker image (Dockerfile.selfhosted): Caddy reverse proxy with auto SSL (Let's Encrypt via DOMAIN/EMAIL env vars), serves frontend + proxies API/WebSocket to Node server
+- 2026-06-24 — Vitest unit tests: 37 tests across server (Traccar/NMEA/HTTP-JSON parsers, auth utils, pagination, config) + frontend (math utils). CI pipeline runs lint → test → build → smoke test selfhosted image
+- 2026-06-24 — docker-compose.test.yml (integration test env), docker-compose.staging.yml (staging deployment), scripts/test-selfhosted-image.sh
 
 ## Architecture
 
@@ -258,6 +260,9 @@ Frontend has its own types in `app/src/types/index.ts` (older/separate — consi
 - [x] Infrastructure: Docker Compose (PostGIS, MinIO, Redis, Keycloak)
 - [x] Infrastructure: .gitignore (node_modules, dist, .env, *.log)
 - [x] Selfhosted all-in-one Docker image: Caddy reverse proxy with auto SSL (Let's Encrypt via DOMAIN/EMAIL env vars)
+- [x] Vitest unit tests: 37 tests across server + frontend
+- [x] docker-compose.test.yml, docker-compose.staging.yml, image smoke test script
+- [x] CI pipeline: lint → test → build → smoke test selfhosted image
 
 ## Next Steps (Priority Order)
 
@@ -387,6 +392,17 @@ docker run -d --name fleetoss -p 80:80 -p 443:443 -p 4000:4000 \
   -e DOMAIN=fleetoss.example.com -e EMAIL=admin@example.com \
   -e DATABASE_URL=postgres://... -e JWT_SECRET=... \
   ghcr.io/fosrl/fleetoss:latest
+
+# Integration test environment
+docker compose -f docker-compose.test.yml up -d
+npm run db:migrate
+npm run test -w packages/server
+
+# Staging (builds from source, staging ports)
+docker compose -f docker-compose.staging.yml up -d
+
+# Smoke test selfhosted image
+bash scripts/test-selfhosted-image.sh
 
 # Ingest a test position via Traccar protocol:
 curl "http://localhost:5055/?id=test-001&lat=47.718&lon=-116.945&speed=34"

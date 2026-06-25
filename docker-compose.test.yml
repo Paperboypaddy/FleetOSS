@@ -1,0 +1,42 @@
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: fleetoss-test-db
+    restart: unless-stopped
+    ports:
+      - '5433:5432'
+    environment:
+      POSTGRES_DB: fleetoss_test
+      POSTGRES_USER: fleetoss
+      POSTGRES_PASSWORD: fleetoss_test
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U fleetoss']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: fleetoss-test-cache
+    restart: unless-stopped
+    ports:
+      - '6380:6379'
+
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fleetoss-test-server
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: '4000'
+      HOST: '0.0.0.0'
+      DATABASE_URL: postgres://fleetoss:fleetoss_test@postgres:5432/fleetoss_test
+      JWT_SECRET: test-secret
+    ports:
+      - '4002:4000'
+
+volumes:
+  pgdata_test:

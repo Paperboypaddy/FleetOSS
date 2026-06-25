@@ -55,7 +55,13 @@ jobs:
         run: npx tsx packages/server/src/db/migrate.ts
         env:
           DATABASE_URL: postgres://fleetoss:fleetoss_test@localhost:5432/fleetoss
-      - name: Smoke test
+      - name: Run server unit tests
+        run: npm run test -w packages/server
+        env:
+          JWT_SECRET: test-secret
+          DATABASE_URL: postgres://fleetoss:fleetoss_test@localhost:5432/fleetoss
+
+      - name: Integration smoke test
         run: |
           node packages/server/dist/index.js &
           SERVER_PID=$!
@@ -66,6 +72,9 @@ jobs:
           DATABASE_URL: postgres://fleetoss:fleetoss_test@localhost:5432/fleetoss
           JWT_SECRET: test-secret
           PORT: '4000'
+
+      - name: Run frontend tests
+        run: cd app && npx vitest run --config vitest.config.mjs
 
   build-and-push:
     runs-on: ubuntu-latest
@@ -106,3 +115,15 @@ jobs:
           file: Dockerfile.selfhosted
           push: true
           tags: ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:latest, ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:${{ github.sha }}
+
+      - name: Smoke test selfhosted image
+        run: |
+          docker run -d --name fleetoss-smoke \
+            -p 4080:80 \
+            -e DOMAIN= \
+            -e EMAIL= \
+            ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:${{ github.sha }}
+          sleep 5
+          curl -sf http://localhost:4080/ | grep -q '<title' || (echo "Frontend failed"; exit 1)
+          curl -sf http://localhost:4080/api/health | grep -q '"status":"ok"' || (echo "API health failed"; exit 1)
+          docker rm -f fleetoss-smoke
